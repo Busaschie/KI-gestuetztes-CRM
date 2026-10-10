@@ -1,13 +1,17 @@
 # Lokale Dienste für die Entwicklung. Start: docker compose up -d
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: sandra-redis
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: sandra-db
+    environment:
+      POSTGRES_DB: sandra_crm
+      POSTGRES_USER: sandra
+      POSTGRES_PASSWORD: sandra   # nur lokal – im Betrieb kommt alles aus Umgebungsvariablen
     ports:
-      - "6379:6379"
+      - "5432:5432"
     volumes:
-      - redis-data:/data
+      - pg-data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  redis-data:
+  pg-data:

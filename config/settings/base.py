@@ -17,9 +17,13 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
+THIRD_PARTY_APPS = [
+    "django_q",
+]
 LOCAL_APPS = [
     "apps.core",
     "apps.accounts",
+    "apps.contacts",
     "apps.candidates",
     "apps.clients",
     "apps.jobs",
@@ -27,7 +31,7 @@ LOCAL_APPS = [
     "apps.communications",
     "apps.privacy",
 ]
-INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -53,7 +57,8 @@ TEMPLATES = [{
     ]},
 }]
 
-DATABASES = {"default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")}
+# Pflicht: DATABASE_URL aus .env bzw. Umgebung (PostgreSQL). Kein stiller Rückfall auf SQLite.
+DATABASES = {"default": env.db("DATABASE_URL")}
 AUTH_USER_MODEL = "accounts.User"
 
 LANGUAGE_CODE = "de-de"
@@ -66,6 +71,35 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CELERY_BROKER_URL = env("REDIS_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = CELERY_BROKER_URL
-ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+# Hintergrundaufgaben: django-q2 mit PostgreSQL als Warteschlange (kein Redis)
+Q_CLUSTER = {
+    "name": "sandra_crm",
+    "orm": "default",
+    "workers": 2,
+    "timeout": 2000,  # Sekunden pro Aufgabe – über OLLAMA_TIMEOUT, lokales Modell kann langsam sein
+    "retry": 2100,    # muss größer als timeout sein
+    "catch_up": False,
+}
+# CV-Postfach (IMAP, febas) – Zugangsdaten nur in der .env
+IMAP_HOST = env("IMAP_HOST", default="")
+IMAP_PORT = env.int("IMAP_PORT", default=993)
+IMAP_SSL = env.bool("IMAP_SSL", default=True)
+IMAP_USER = env("IMAP_USER", default="")
+IMAP_PASSWORD = env("IMAP_PASSWORD", default="")
+IMAP_FOLDER = env("IMAP_FOLDER", default="INBOX")
+IMAP_PROCESSED_FOLDER = env("IMAP_PROCESSED_FOLDER", default="")  # leer = nur als gelesen markieren
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))  # CV-Originale (später EU-Objektspeicher)
+
+# Sprachmodell – austauschbar (siehe work/entscheidungen.md)
+LLM_PROVIDER = env("LLM_PROVIDER", default="ollama")  # mistral | ollama | fake
+MISTRAL_API_KEY = env("MISTRAL_API_KEY", default="")
+MISTRAL_MODEL = env("MISTRAL_MODEL", default="mistral-small-latest")
+MISTRAL_OCR_MODEL = env("MISTRAL_OCR_MODEL", default="mistral-ocr-latest")
+MISTRAL_MAX_TOKENS = env.int("MISTRAL_MAX_TOKENS", default=4096)  # max. Antwortlänge (zählt gegen Tokens/Minute)
+OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
+OLLAMA_MODEL = env("OLLAMA_MODEL", default="qwen3:8b")
+OLLAMA_TIMEOUT = env.int("OLLAMA_TIMEOUT", default=1800)  # Gesamtdauer pro CV in Sekunden (Antwort wird gestreamt)
+OLLAMA_NUM_CTX = env.int("OLLAMA_NUM_CTX", default=16384)  # Kontextgröße in Tokens
+OLLAMA_NUM_PREDICT = env.int("OLLAMA_NUM_PREDICT", default=4096)  # max. Antwortlänge in Tokens

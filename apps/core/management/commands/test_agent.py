@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
+from django_q.tasks import result
 
-from agents.tasks import run_agent
+from agents.tasks import enqueue_agent
 
 
 class Command(BaseCommand):
@@ -10,6 +11,10 @@ class Command(BaseCommand):
         parser.add_argument("text", nargs="?", default="Hallo Sandra")
 
     def handle(self, *args, **opts):
-        result = run_agent.delay("echo", text=opts["text"])
-        self.stdout.write(f"Auftrag {result.id} an Redis übergeben – warte auf Worker …")
-        self.stdout.write(self.style.SUCCESS(f"Ergebnis: {result.get(timeout=30)}"))
+        task_id = enqueue_agent("echo", text=opts["text"])
+        self.stdout.write(f"Auftrag {task_id} in die Warteschlange gelegt – warte auf Worker …")
+        res = result(task_id, wait=30_000)  # Millisekunden
+        if res is None:
+            self.stderr.write(self.style.ERROR("Kein Ergebnis nach 30 s – läuft 'python manage.py qcluster'?"))
+            return
+        self.stdout.write(self.style.SUCCESS(f"Ergebnis: {res}"))

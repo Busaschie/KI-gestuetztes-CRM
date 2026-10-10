@@ -1,0 +1,1 @@
+"""Geschäftslogik – Views bleiben schlank."""
