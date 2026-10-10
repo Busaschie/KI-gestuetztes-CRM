@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 staticfiles/
 media/
+db.sqlite3
+.idea/sandra-crm.iml

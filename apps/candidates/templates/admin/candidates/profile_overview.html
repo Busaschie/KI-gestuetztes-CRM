@@ -1,0 +1,45 @@
+<div class="profile-overview">
+<style>
+  .profile-overview { max-width: 900px; line-height: 1.45; }
+  .profile-overview h3 { margin: 18px 0 6px; padding: 4px 0; border-bottom: 1px solid var(--hairline-color, #ddd); background: none; color: var(--body-fg, #333); font-size: 14px; }
+  .profile-overview ul { margin: 0; padding: 0; list-style: none; }
+  .profile-overview li.entry { margin: 0 0 10px; padding: 0; list-style: none; }
+  .profile-overview .period { display: inline-block; min-width: 140px; color: var(--body-quiet-color, #666); }
+  .profile-overview .sub { margin-left: 144px; color: var(--body-quiet-color, #666); }
+  .profile-overview ul.points { margin: 2px 0 0 160px; list-style: disc; }
+  .profile-overview ul.points li { list-style: disc; padding: 0; }
+  .profile-overview .tag { display: inline-block; margin: 0 4px 4px 0; padding: 1px 8px; border-radius: 10px; background: var(--darkened-bg, #f0f0f0); }
+  .profile-overview .empty { color: var(--body-quiet-color, #999); }
+</style>
+
+<h3>Berufliche Stationen</h3>
+{% if positions %}<ul>{% for p in positions %}
+  <li class="entry"><span class="period">{{ p.period }}</span><strong>{{ p.title }}</strong>{% if p.is_current %} <em>(aktuell)</em>{% endif %}
+    {% if p.where %}<div class="sub">{{ p.where }}</div>{% endif %}
+    {% if p.tasks %}<ul class="points">{% for t in p.tasks %}<li>{{ t }}</li>{% endfor %}</ul>{% endif %}
+  </li>{% endfor %}</ul>
+{% else %}<p class="empty">Keine Einträge</p>{% endif %}
+
+<h3>Aus- und Weiterbildung</h3>
+{% if education %}<ul>{% for e in education %}
+  <li class="entry"><span class="period">{{ e.period }}</span><strong>{{ e.title }}</strong>{% if e.kind and e.kind != "sonstiges" %} <em>({{ e.kind }})</em>{% endif %}
+    {% if e.where %}<div class="sub">{{ e.where }}</div>{% endif %}
+    {% if e.details %}<ul class="points">{% for d in e.details %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
+  </li>{% endfor %}</ul>
+{% else %}<p class="empty">Keine Einträge</p>{% endif %}
+
+{% if certifications %}<h3>Zertifikate</h3><ul>{% for c in certifications %}
+  <li class="entry"><span class="period">{{ c.year|default:"" }}</span><strong>{{ c.name }}</strong>{% if c.issuer %} – {{ c.issuer }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+
+{% if other %}<h3>Sonstiges</h3><ul>{% for o in other %}
+  <li class="entry"><span class="period">{{ o.period }}</span><strong>{{ o.title }}</strong>{% if o.organization %} – {{ o.organization }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+
+<h3>Sprachen</h3>
+{% if languages %}<ul>{% for l in languages %}
+  <li class="entry"><span class="period">{{ l.name }}</span>{{ l.level|default:"–" }}</li>{% endfor %}</ul>
+{% else %}<p class="empty">Keine Einträge</p>{% endif %}
+
+{% for label, items in tags %}{% if items %}
+<h3>{{ label }}</h3><div>{% for i in items %}<span class="tag">{{ i }}</span>{% endfor %}</div>
+{% endif %}{% endfor %}
+</div>
