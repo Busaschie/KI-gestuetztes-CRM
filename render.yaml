@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sandra-crm
+    runtime: python
+    buildCommand: pip install -r requirements/prod.txt && python manage.py collectstatic --noinput && python manage.py migrate
+    startCommand: gunicorn config.wsgi
+  - type: worker
+    name: sandra-crm-worker
+    runtime: python
+    buildCommand: pip install -r requirements/prod.txt
+    startCommand: celery -A config worker -l info

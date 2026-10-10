@@ -1,0 +1,13 @@
+# Lokale Dienste für die Entwicklung. Start: docker compose up -d
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: sandra-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  redis-data:
