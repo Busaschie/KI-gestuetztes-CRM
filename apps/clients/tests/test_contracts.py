@@ -155,3 +155,15 @@ def test_webhook_view_rejects_without_configured_secret(client, settings, contra
     resp = client.post("/clients/docuseal/webhook/", "{}", content_type="application/json",
                        headers={"X-Docuseal-Secret": ""})
     assert resp.status_code == 403
+
+
+def test_media_only_for_staff(client, contract, django_user_model):
+    send_contract(contract)
+    fetch_signed_document(contract.pk, "https://sign.example/doc.pdf")
+    contract.refresh_from_db()
+    url = contract.document.url
+    assert client.get(url).status_code == 302  # Weiterleitung zum Login
+    client.force_login(django_user_model.objects.create_superuser("admin", "a@example.com", "pw"))
+    resp = client.get(url)
+    assert resp.status_code == 200
+    assert b"".join(resp.streaming_content).startswith(b"%PDF-1.4")
