@@ -30,6 +30,7 @@ LOCAL_APPS = [
     "apps.pipeline",
     "apps.communications",
     "apps.privacy",
+    "apps.bot",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -112,3 +113,8 @@ DOCUSEAL_TEMPLATE_ID = env("DOCUSEAL_TEMPLATE_ID", default="")
 DOCUSEAL_SIGNER_ROLE = env("DOCUSEAL_SIGNER_ROLE", default="First Party")  # Rolle in der DocuSeal-Vorlage
 DOCUSEAL_WEBHOOK_HEADER = env("DOCUSEAL_WEBHOOK_HEADER", default="X-Docuseal-Secret")
 DOCUSEAL_WEBHOOK_SECRET = env("DOCUSEAL_WEBHOOK_SECRET", default="")  # leer = Webhook abgelehnt
+
+# Telegram-Bot – Kanal zu Sandra. Token nur in der .env
+TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
+TELEGRAM_ALLOWED_CHAT_IDS = env.list("TELEGRAM_ALLOWED_CHAT_IDS", cast=int, default=[])  # leer = niemand freigeschaltet
+TELEGRAM_BRIEFING_TIME = env("TELEGRAM_BRIEFING_TIME", default="07:30")  # Ortszeit (TIME_ZONE)

@@ -57,6 +57,7 @@ class InboundItem(TimeStampedModel):
     class Channel(models.TextChoices):
         EMAIL = "email", "E-Mail"
         VOICE = "voice", "Sprachnachricht"
+        TELEGRAM = "telegram", "Telegram-Text"
         LINKEDIN_CSV = "linkedin_csv", "LinkedIn-Export"
         FILE_IMPORT = "file_import", "Datei-Import"
 
