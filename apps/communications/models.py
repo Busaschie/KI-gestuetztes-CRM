@@ -1,5 +1,6 @@
 """Notizen, Wiedervorlagen, Eingänge und ausgehende Nachrichten."""
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.contacts.models import Person
@@ -126,3 +127,24 @@ class OutboundMessage(TimeStampedModel):
 
     def __str__(self):
         return f"{self.get_kind_display()} an {self.recipient} ({self.get_status_display()})"
+
+    # Status, in denen eine Nachricht unterwegs ist oder war – hier greift die Vertragssperre
+    ACTIVE_STATES = (Status.AWAITING_APPROVAL, Status.SCHEDULED, Status.SENT)
+
+    def check_contract_lock(self):
+        """Harte Sperre (P1 Punkt 4): Profil an Kunden nur bei unterschriebenem Vertrag zum Auftrag.
+        Entwürfe sind erlaubt, damit Sandra vorbereiten kann."""
+        if self.kind != self.Kind.PROFILE_TO_CLIENT or self.status not in self.ACTIVE_STATES:
+            return
+        if not self.mandate_id:
+            raise ValidationError({"mandate": "Profilversand an Kunden nur mit zugeordnetem Auftrag."})
+        if not self.mandate.has_signed_contract:
+            raise ValidationError("Gesperrt: Für diesen Auftrag gibt es keinen unterschriebenen Vertrag.")
+
+    def clean(self):
+        super().clean()
+        self.check_contract_lock()
+
+    def save(self, *args, **kwargs):
+        self.check_contract_lock()  # auch außerhalb des Admins (Agenten, Telegram, Skripte)
+        super().save(*args, **kwargs)

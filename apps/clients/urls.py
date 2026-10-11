@@ -1,4 +1,8 @@
-from django.urls import path  # noqa
+from django.urls import path
+
+from . import views
 
 app_name = "clients"
-urlpatterns = []
+urlpatterns = [
+    path("docuseal/webhook/", views.docuseal_webhook, name="docuseal_webhook"),
+]

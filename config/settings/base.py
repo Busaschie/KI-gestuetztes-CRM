@@ -103,3 +103,12 @@ OLLAMA_MODEL = env("OLLAMA_MODEL", default="qwen3:8b")
 OLLAMA_TIMEOUT = env.int("OLLAMA_TIMEOUT", default=1800)  # Gesamtdauer pro CV in Sekunden (Antwort wird gestreamt)
 OLLAMA_NUM_CTX = env.int("OLLAMA_NUM_CTX", default=16384)  # Kontextgröße in Tokens
 OLLAMA_NUM_PREDICT = env.int("OLLAMA_NUM_PREDICT", default=4096)  # max. Antwortlänge in Tokens
+
+# E-Signatur – austauschbar (docuseal | fake). Zugangsdaten nur in der .env
+SIGNATURE_PROVIDER = env("SIGNATURE_PROVIDER", default="fake")
+DOCUSEAL_API_URL = env("DOCUSEAL_API_URL", default="https://api.docuseal.eu")  # selbst gehostet: https://<host>/api
+DOCUSEAL_API_KEY = env("DOCUSEAL_API_KEY", default="")
+DOCUSEAL_TEMPLATE_ID = env("DOCUSEAL_TEMPLATE_ID", default="")
+DOCUSEAL_SIGNER_ROLE = env("DOCUSEAL_SIGNER_ROLE", default="First Party")  # Rolle in der DocuSeal-Vorlage
+DOCUSEAL_WEBHOOK_HEADER = env("DOCUSEAL_WEBHOOK_HEADER", default="X-Docuseal-Secret")
+DOCUSEAL_WEBHOOK_SECRET = env("DOCUSEAL_WEBHOOK_SECRET", default="")  # leer = Webhook abgelehnt
