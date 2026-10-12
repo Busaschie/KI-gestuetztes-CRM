@@ -156,7 +156,7 @@ def test_schema_limits_list_lengths():
     from agents.llm.schemas import CV_SCHEMA
 
     assert CV_SCHEMA["properties"]["skills"]["maxItems"] == 40
-    assert CV_SCHEMA["$defs"]["PositionOut"]["properties"]["tasks"]["maxItems"] == 6
+    assert CV_SCHEMA["$defs"]["PositionOut"]["properties"]["tasks"]["maxItems"] == 8
 
 
 def test_ollama_reports_truncated_loop_with_tail():
@@ -209,3 +209,49 @@ def test_mistral_gives_clear_hint_when_rate_limit_persists():
                         transport=httpx.MockTransport(lambda r: httpx.Response(429, json={})))
     with pytest.raises(LLMError, match="Ratenlimit.*Pay-as-you-go"):
         p.complete_json("s", "u", {})
+
+
+SAMPLE_EXPERIENCE = """WORK EXPERIENCE
+Office Manager | Executive Support
+Musterfirma GmbH, Munich
+May 2024 – Present
+• Support senior leadership
+Office Manager
+Beispiel Group GmbH, Munich
+May 2023 – September 2023
+(concurrent with Master's degree)
+Office Manager | Team Assistant
+Test GmbH, Munich
+September 2022 – February 2023
+Guest Relations Specialist | Luxury Hospitality
+Mykonos, Greece | 2015–2021
+EDUCATION
+M.A. Management 2021 – 2023
+"""
+
+
+def test_dates_are_normalized_across_languages():
+    from agents.llm.schemas import normalize_date
+
+    assert [normalize_date(d) for d in ["May 2024", "Mai 2024", "mai 2024", "Sept. 2022", "05/2024", "03.2021", "2015", "Present"]] == \
+        ["2024-05", "2024-05", "2024-05", "2022-09", "2024-05", "2021-03", "2015", "Present"]
+
+
+def test_date_ranges_are_counted():
+    from agents.llm.schemas import count_date_ranges
+
+    assert count_date_ranges(SAMPLE_EXPERIENCE) == 5
+    assert count_date_ranges("seit 2026 Weiterbildung\n1991 – 1992 Wehrdienst") == 2
+
+
+def test_completeness_hint_when_stations_are_missing():
+    from agents.llm.schemas import CVProfile, completeness_hint, normalize_llm_output
+
+    raw = {"positions": [{"title": "Office Manager | Executive Support", "company": "Musterfirma GmbH", "start": "May 2024", "end": "Present"},
+                         {"title": "Office Manager", "start": "May 2023", "end": "September 2023"}]}
+    p = CVProfile.model_validate(normalize_llm_output(raw))
+    assert p.positions[0].start == "2024-05" and p.positions[0].is_current and p.positions[1].end == "2023-09"
+    hint = completeness_hint(p, SAMPLE_EXPERIENCE)
+    assert "5 Zeiträume" in hint and "2 Berufsstationen" in hint
+    full = CVProfile.model_validate({"positions": [{"title": f"P{i}"} for i in range(4)], "education": [{"title": "M.A."}]})
+    assert completeness_hint(full, SAMPLE_EXPERIENCE) == ""

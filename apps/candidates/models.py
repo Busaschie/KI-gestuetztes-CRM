@@ -1,7 +1,9 @@
 """Kandidatenprofil und CV-Versionen (P1 Punkt 2). Personendaten liegen in contacts.Person."""
 import hashlib
+from pathlib import Path
 
 from django.db import models
+from django.utils import timezone
 
 from apps.contacts.models import Person
 from apps.core.models import Origin, TimeStampedModel
@@ -45,10 +47,10 @@ class CVDocument(TimeStampedModel):
     """Eine CV-Version. Originale werden nie verändert, ältere Versionen bleiben abrufbar."""
     profile = models.ForeignKey(CandidateProfile, on_delete=models.CASCADE, related_name="cvs")
     file = models.FileField("Datei", upload_to=cv_upload_path)
-    original_filename = models.CharField("Originaler Dateiname", max_length=255)
+    original_filename = models.CharField("Originaler Dateiname", max_length=255, blank=True)
     checksum = models.CharField("SHA-256", max_length=64, db_index=True, editable=False)
-    received_at = models.DateTimeField("Eingegangen")
-    origin = models.CharField("Quelle", max_length=20, choices=Origin.choices)
+    received_at = models.DateTimeField("Eingegangen", default=timezone.now)
+    origin = models.CharField("Quelle", max_length=20, choices=Origin.choices, default=Origin.MANUAL)
     is_current = models.BooleanField("Aktuelle Version", default=True)
     extracted_text = models.TextField("Ausgelesener Text", blank=True)
     ocr_used = models.BooleanField("Texterkennung (OCR)", default=False)
@@ -62,6 +64,8 @@ class CVDocument(TimeStampedModel):
         return f"{self.original_filename} ({self.received_at:%d.%m.%Y})"
 
     def save(self, *args, **kwargs):
+        if not self.original_filename and self.file:
+            self.original_filename = Path(self.file.name).name
         if not self.checksum and self.file:
             h = hashlib.sha256()
             for chunk in self.file.chunks():

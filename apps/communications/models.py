@@ -78,7 +78,7 @@ class InboundItem(TimeStampedModel):
     raw_text = models.TextField("Inhalt / Transkript", blank=True)
     attachment = models.FileField("Anhang (Original)", upload_to="inbound/%Y/%m/", blank=True)
     person = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True, related_name="inbound_items")
-    error = models.TextField("Fehler", blank=True)
+    error = models.TextField("Ergebnis / Fehler", blank=True)
     processed_at = models.DateTimeField("Verarbeitet am", null=True, blank=True)
 
     class Meta:

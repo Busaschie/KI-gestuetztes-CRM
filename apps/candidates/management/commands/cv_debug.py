@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand
 
 from agents.llm.client import get_ocr
 from agents.tools.text_extract import extract_text
+from agents.llm.schemas import completeness_hint
 from apps.candidates.services import parse_profile
 
 
@@ -29,6 +30,8 @@ class Command(BaseCommand):
         self.stdout.write(f"Dauer: {time.perf_counter() - t:.0f} s\nRohe Antwort:")
         self.stdout.write(json.dumps(raw, ensure_ascii=False, indent=2)[:8000])
         self.stdout.write(self.style.SUCCESS(f"\nErkannt: {p.first_name} {p.last_name} | {p.email} | {p.phone} | {p.linkedin_url} | {len(p.positions)} Positionen"))
+        if hint := completeness_hint(p, ex.text):
+            self.stdout.write(self.style.WARNING(hint))
 
     def _progress(self, chars: int, seconds: float):
         self.stdout.write(f"  … {chars} Zeichen nach {seconds:.0f} s", ending="\n")

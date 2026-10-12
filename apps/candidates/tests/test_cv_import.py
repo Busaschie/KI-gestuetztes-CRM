@@ -158,3 +158,49 @@ def test_unexpected_error_marks_inbound_failed(monkeypatch):
     r = process_cv_inbound(item)
     item.refresh_from_db()
     assert r.status == item.status == InboundItem.Status.FAILED and "kaputt" in item.error
+
+
+@pytest.mark.django_db
+def test_reparse_updates_profile_without_new_version_and_keeps_manual_data():
+    from apps.candidates.services import reparse_profile
+
+    r = run("a.docx", make_docx(CV_TEXT))
+    person = r.person
+    person.phone = "+43 660 1111111"  # von Hand gepflegt
+    person.save()
+    FakeProvider.response = {**LLM_ANSWER, "headline": "Head of Sales", "phone": "+43 999", "skills": ["CRM", "Vertrieb"]}
+    res = reparse_profile(person.candidate_profile)
+    person.refresh_from_db()
+    profile = person.candidate_profile
+    profile.refresh_from_db()
+    assert res.status == InboundItem.Status.ASSIGNED and "Neu ausgelesen" in res.message
+    assert profile.headline == "Head of Sales" and profile.skills == ["CRM", "Vertrieb"]
+    assert person.phone == "+43 660 1111111"
+    assert CVDocument.objects.count() == 1 and InboundItem.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_manually_uploaded_new_cv_becomes_current_and_is_used(tmp_path):
+    from django.core.files.base import ContentFile
+
+    from apps.candidates.services import reparse_profile
+
+    r = run("alt.docx", make_docx(CV_TEXT))
+    profile = r.person.candidate_profile
+    new = CVDocument(profile=profile)
+    new.file.save("neu 2026.docx", ContentFile(make_docx(CV_TEXT + "Neue Station: Vertriebsdirektorin\n")), save=True)
+    assert new.original_filename == "neu_2026.docx" or new.original_filename.startswith("neu")
+    assert new.is_current and not CVDocument.objects.exclude(pk=new.pk).get().is_current
+    FakeProvider.response = {**LLM_ANSWER, "headline": "Vertriebsdirektorin"}
+    assert "neu" in reparse_profile(profile).message
+    profile.refresh_from_db()
+    assert profile.headline == "Vertriebsdirektorin"
+
+
+@pytest.mark.django_db
+def test_reparse_without_cv_fails_clearly():
+    from apps.candidates.models import CandidateProfile
+    from apps.candidates.services import reparse_profile
+
+    p = CandidateProfile.objects.create(person=Person.objects.create(last_name="Ohne"))
+    assert reparse_profile(p).status == InboundItem.Status.FAILED

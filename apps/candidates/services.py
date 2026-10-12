@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from agents.llm.base import LLMError
 from agents.llm.client import get_llm, get_ocr
-from agents.llm.schemas import CV_SCHEMA, CVProfile, fill_from_text, normalize_llm_output
+from agents.llm.schemas import CV_SCHEMA, CVProfile, completeness_hint, fill_from_text, normalize_llm_output
 from agents.tools.text_extract import UnsupportedFile, extract_text
 from apps.communications.models import InboundItem
 from apps.contacts.models import Company, Employment, Person, PersonOrigin
@@ -111,7 +111,9 @@ def _process(item: InboundItem, origin: str, on_progress=None) -> ImportResult:
             is_current=True,
         ).file.save(filename, ContentFile(data), save=True)
         _suggest_duplicates(person)
-    return finish(InboundItem.Status.ASSIGNED, "Neues Profil" if created else "Neue CV-Version", person, created)
+    hint = completeness_hint(profile_data, extracted.text)
+    message = ("Neues Profil" if created else "Neue CV-Version") + (f" – {hint}" if hint else "")
+    return finish(InboundItem.Status.ASSIGNED, message, person, created)
 
 
 def parse_profile(text: str, on_progress=None) -> tuple[dict, CVProfile]:
@@ -134,13 +136,17 @@ def _match_or_create_person(p: CVProfile) -> tuple[Person, bool]:
     created = person is None
     if created:
         person = Person()
-    # Nur leere Felder füllen – von Hand gepflegte Daten werden nicht überschrieben
+    _fill_person(person, p)
+    return person, created
+
+
+def _fill_person(person: Person, p: CVProfile) -> None:
+    """Nur leere Felder füllen – von Hand gepflegte Daten werden nicht überschrieben."""
     for field in ("first_name", "last_name", "email", "phone", "linkedin_url", "city", "region", "country"):
         value = getattr(p, field)
         if value and not getattr(person, field):
             setattr(person, field, value.strip()[: Person._meta.get_field(field).max_length])
     person.save()
-    return person, created
 
 
 def _update_profile(person: Person, p: CVProfile) -> None:
@@ -189,3 +195,42 @@ def _suggest_duplicates(person: Person) -> None:
         a, b = sorted([person, other], key=lambda x: x.pk)
         if not DuplicateSuggestion.objects.filter(person_a=a, person_b=b).exists():
             DuplicateSuggestion.objects.create(person_a=a, person_b=b, reason="Gleicher Vor- und Nachname")
+
+
+def reparse_profile(profile: CandidateProfile, on_progress=None) -> ImportResult:
+    """Liest den aktuellen Lebenslauf des Profils mit dem aktuellen Prompt neu aus und aktualisiert das Profil.
+
+    - Kein neuer Eingang, keine neue CV-Version, keine Dublettenprüfung.
+    - Ausgelesene Profilfelder werden ersetzt; Personendaten nur ergänzt (von Hand Gepflegtes bleibt).
+    - Neuer Lebenslauf eines Kandidaten: im Admin beim Profil als neue Version hochladen, dann neu auslesen.
+    """
+    cv = profile.cvs.filter(is_current=True).first() or profile.cvs.first()
+    if cv is None:
+        return ImportResult(InboundItem.Status.FAILED, profile.person, message="Kein Lebenslauf am Profil hinterlegt")
+    if cv.ocr_used and cv.extracted_text:
+        text = cv.extracted_text  # Scan nicht erneut per OCR schicken
+    else:
+        cv.file.open("rb")
+        data = cv.file.read()
+        cv.file.close()
+        try:
+            extracted = extract_text(cv.original_filename or cv.file.name, data, ocr=get_ocr())
+        except (UnsupportedFile, LLMError) as e:
+            return ImportResult(InboundItem.Status.FAILED, profile.person, message=str(e))
+        if extracted.needs_ocr:
+            return ImportResult(InboundItem.Status.FAILED, profile.person,
+                                message="Gescanntes PDF – Texterkennung nicht verfügbar (MISTRAL_API_KEY fehlt)")
+        text = extracted.text
+        cv.extracted_text, cv.ocr_used = text, extracted.ocr_used
+        cv.save(update_fields=["extracted_text", "ocr_used", "updated_at"])
+    try:
+        _, profile_data = parse_profile(text, on_progress=on_progress)
+    except (LLMError, ValidationError) as e:
+        return ImportResult(InboundItem.Status.FAILED, profile.person, message=f"KI-Auslese fehlgeschlagen: {e}")
+    with transaction.atomic():
+        _fill_person(profile.person, profile_data)
+        _update_profile(profile.person, profile_data)
+        _update_employments(profile.person, profile_data, cv.origin)
+    hint = completeness_hint(profile_data, text)
+    return ImportResult(InboundItem.Status.ASSIGNED, profile.person,
+                        message=f"Neu ausgelesen aus {cv.original_filename}" + (f" – {hint}" if hint else ""))

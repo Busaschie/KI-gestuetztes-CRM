@@ -12,7 +12,7 @@ class PositionOut(BaseModel):
     start: str | None = Field(None, description="JJJJ-MM oder JJJJ")
     end: str | None = Field(None, description="JJJJ-MM, JJJJ oder null wenn aktuell")
     is_current: bool = False
-    tasks: list[str] = Field([], description="Aufgaben/Erfolge als kurze Stichpunkte, max. 6")
+    tasks: list[str] = Field([], description="Aufgaben/Erfolge als kurze Stichpunkte, max. 8, in der Sprache des CV")
 
 
 class EducationOut(BaseModel):
@@ -53,8 +53,8 @@ class CVProfile(BaseModel):
     region: str | None = None
     country: str | None = Field(None, description="ISO-Code, z. B. AT, DE, RO")
     willing_to_relocate: bool | None = Field(None, description="true nur bei ausdrücklicher Umzugs-/Mobilitätsbereitschaft")
-    headline: str | None = Field(None, description="Berufliches Kurzprofil, max. 10 Wörter – nicht der Name")
-    summary: str | None = Field(None, description="3–5 Sätze, nur belegte Fakten")
+    headline: str | None = Field(None, description="Berufliches Kurzprofil, max. 10 Wörter, in der Sprache des CV – nicht der Name")
+    summary: str | None = Field(None, description="Profiltext des CV wörtlich (ohne geschützte Merkmale); nur wenn keiner da ist, 2–3 eigene Sätze")
     positions: list[PositionOut] = []
     education: list[EducationOut] = []
     certifications: list[CertificationOut] = []
@@ -70,7 +70,7 @@ class CVProfile(BaseModel):
 
 # Obergrenzen für Listen: verhindern, dass kleine Modelle Einträge endlos wiederholen
 MAX_ITEMS = {
-    "positions": 25, "tasks": 6, "education": 12, "details": 6, "certifications": 15,
+    "positions": 25, "tasks": 8, "education": 12, "details": 6, "certifications": 15,
     "other_experience": 8, "industries": 10, "skills": 40, "strengths": 12, "interests": 10, "languages": 10,
 }
 
@@ -100,7 +100,35 @@ def strict_schema(model) -> dict:
 CV_SCHEMA = strict_schema(CVProfile)
 
 
-ONGOING = {"heute", "bis heute", "jetzt", "aktuell", "laufend", "today", "present", "now", "current", "prezent"}
+ONGOING = {"heute", "bis heute", "jetzt", "aktuell", "laufend", "today", "present", "now", "current", "prezent",
+           "până în prezent", "pana in prezent", "ongoing", "to date"}
+
+MONTHS = {
+    # DE
+    "januar": 1, "jänner": 1, "februar": 2, "märz": 3, "maerz": 3, "april": 4, "mai": 5, "juni": 6, "juli": 7,
+    "august": 8, "september": 9, "oktober": 10, "november": 11, "dezember": 12,
+    # EN
+    "january": 1, "february": 2, "march": 3, "may": 5, "june": 6, "july": 7, "october": 10, "december": 12,
+    # RO
+    "ianuarie": 1, "februarie": 2, "martie": 3, "aprilie": 4, "iunie": 6, "iulie": 7, "septembrie": 9,
+    "octombrie": 10, "noiembrie": 11, "decembrie": 12,
+}
+_MONTH_RE = re.compile(r"^([a-zäöüăâîșțşţ]+)\.?\s+((?:19|20)\d{2})$", re.I)
+_NUMERIC_RE = re.compile(r"^(\d{1,2})[./-]((?:19|20)\d{2})$")
+
+
+def normalize_date(value: str) -> str:
+    """'May 2024' / 'Mai 2024' / 'mai 2024' / '05/2024' / '05.2024' → '2024-05'. Anderes bleibt unverändert."""
+    v = value.strip()
+    if m := _NUMERIC_RE.match(v):
+        month = int(m.group(1))
+        return f"{m.group(2)}-{month:02d}" if 1 <= month <= 12 else v
+    if m := _MONTH_RE.match(v):
+        name = m.group(1).lower()
+        month = MONTHS.get(name) or next((n for k, n in MONTHS.items() if len(name) >= 3 and k.startswith(name)), None)
+        if month:
+            return f"{m.group(2)}-{month:02d}"
+    return v
 
 ALIASES = {
     "vorname": "first_name", "firstname": "first_name", "given_name": "first_name",
@@ -122,9 +150,15 @@ def normalize_llm_output(raw) -> dict:
     while len(raw) == 1 and isinstance(next(iter(raw.values())), dict):
         raw = next(iter(raw.values()))
     data = {ALIASES.get(k.lower(), k): v for k, v in raw.items()}
-    for pos in data.get("positions") or []:
-        if isinstance(pos, dict) and isinstance(pos.get("end"), str) and pos["end"].strip().lower() in ONGOING:
-            pos["end"], pos["is_current"] = None, True
+    for key in ("positions", "education", "other_experience"):
+        for entry in data.get(key) or []:
+            if not isinstance(entry, dict):
+                continue
+            for f in ("start", "end"):
+                if isinstance(entry.get(f), str):
+                    entry[f] = normalize_date(entry[f])
+            if key == "positions" and isinstance(entry.get("end"), str) and entry["end"].strip().lower() in ONGOING:
+                entry["end"], entry["is_current"] = None, True
     full = data.get("name") or data.get("full_name")
     if isinstance(full, str) and not data.get("last_name"):
         parts = full.strip().split()
@@ -207,3 +241,26 @@ def _language_in_text(name: str, text: str) -> bool:
     variants = next((v for k, v in LANGUAGE_VARIANTS.items() if key == k or key in v), [key])
     lowered = text.lower()
     return any(re.search(rf"(?<!\w){re.escape(v)}(?!\w)", lowered) for v in variants if v)
+
+
+_RANGE_RE = re.compile(
+    r"(?:(?:19|20)\d{2})\s*(?:–|—|-|bis|to|până la)\s*(?:[A-Za-zäöüÄÖÜăâîșț.]+\s+)?"
+    r"(?:(?:19|20)\d{2}|present|heute|today|now|jetzt|aktuell|prezent|current)"
+    r"|(?:seit|since|din)\s+(?:[A-Za-zäöüăâîșț.]+\s+)?(?:19|20)\d{2}",
+    re.I,
+)
+
+
+def count_date_ranges(text: str) -> int:
+    """Zählt Zeiträume im CV-Text (z. B. 'May 2023 – September 2023', '2015–2021', 'seit 2026')."""
+    return len(_RANGE_RE.findall(text))
+
+
+def completeness_hint(profile: "CVProfile", text: str) -> str:
+    """Hinweis, wenn deutlich weniger Einträge erkannt wurden, als der Text Zeiträume enthält (Grundsatz 8)."""
+    ranges = count_date_ranges(text)
+    found = len(profile.positions) + len(profile.education) + len(profile.other_experience)
+    if ranges - found >= 2:
+        return (f"Hinweis: {ranges} Zeiträume im Text, aber nur {found} Stationen/Ausbildungen erkannt "
+                f"({len(profile.positions)} Berufsstationen) – bitte prüfen")
+    return ""

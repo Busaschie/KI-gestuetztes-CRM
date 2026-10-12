@@ -8,6 +8,7 @@ class CVInline(admin.TabularInline):
     model = CVDocument
     extra = 0
     fields = ["file", "original_filename", "received_at", "origin", "is_current"]
+    readonly_fields = ["original_filename"]
 
 
 @admin.register(CandidateProfile)
@@ -16,6 +17,7 @@ class CandidateProfileAdmin(admin.ModelAdmin):
     search_fields = ["person__first_name", "person__last_name", "headline"]
     autocomplete_fields = ["person"]
     inlines = [CVInline]
+    actions = ["reparse"]
     readonly_fields = ["overview"]
     fieldsets = [
         (None, {"fields": ["person", "headline", "summary"]}),
@@ -36,6 +38,17 @@ class CandidateProfileAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "Wird nach dem Speichern bzw. nach der CV-Auslese angezeigt."
         return render_profile(obj)
+
+    @admin.action(description="Mit aktuellem Lebenslauf neu auslesen")
+    def reparse(self, request, queryset):
+        from agents.tasks import enqueue_agent
+
+        for profile in queryset:
+            enqueue_agent("cv_reparse", profile_id=profile.pk)
+        self.message_user(
+            request,
+            f"{queryset.count()} Profil(e) in die Warteschlange gelegt – läuft im Hintergrund (qcluster muss laufen).",
+        )
 
 
 @admin.register(DuplicateSuggestion)
