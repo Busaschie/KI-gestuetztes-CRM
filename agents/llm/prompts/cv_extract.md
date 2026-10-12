@@ -22,18 +22,7 @@ Werdegang – "positions"
 - "company": der Arbeitgeber. Steht in der Zeile "Firma, Ort" → company = Firma, location = Ort.
   Steht dort NUR ein Ort (z. B. "Mykonos, Greece | 2015–2021") → company = null, location = Ort. Keinen Arbeitgeber erfinden.
 - "start"/"end": als "JJJJ-MM" oder "JJJJ" (z. B. "May 2023" → "2023-05"). "Present", "heute", "bis jetzt", "prezent" → end = null, is_current = true.
-- "tasks": die Stichpunkte der Station (max. 8, gekürzt, Originalsprache). Anmerkungen wie "(concurrent with Master's degree)" als eigener Stichpunkt.
-
-Beispiel (erfunden) – Text:
-  Team Assistant | Sales Support
-  Nordlicht AG, Hamburg
-  March 2021 – Present
-  • Managed travel and calendars
-  Tour Guide | Adventure Travel
-  Lisbon, Portugal | 2016–2019
-Ergebnis:
-  [{"title": "Team Assistant | Sales Support", "company": "Nordlicht AG", "location": "Hamburg", "start": "2021-03", "end": null, "is_current": true, "tasks": ["Managed travel and calendars"]},
-   {"title": "Tour Guide | Adventure Travel", "company": null, "location": "Lisbon, Portugal", "start": "2016", "end": "2019", "is_current": false, "tasks": []}]
+- "tasks": NUR die Stichpunkte, die direkt unter DIESER Station stehen (max. 8, wörtlich, Originalsprache). Nicht die Stichpunkte der Nachbarstation, keine Kompetenzen aus anderen Abschnitten. Anmerkungen wie "(concurrent with Master's degree)" als eigener Stichpunkt.
 
 Weitere Abschnitte
 - "education": Berufsausbildung, Studium, Schule UND Weiterbildungen/Fortbildungen (auch "Aktuelle Weiterbildung").
@@ -51,6 +40,7 @@ Kompetenzen
 - "has_leadership": true nur bei ausdrücklicher Führungsverantwortung, sonst null.
 
 Regeln
-- Nichts erfinden, nichts schätzen, nichts aus Allgemeinwissen ergänzen.
+- Nichts erfinden, nichts schätzen, nichts aus Allgemeinwissen ergänzen. Jeder Wert muss so im Lebenslauf stehen.
+- Unbekannt = null (JSON-null), niemals der Text "null".
 - Erfasse KEINE geschützten Merkmale: kein Alter, kein Geburtsdatum, kein Geschlecht, keine Staatsangehörigkeit oder Herkunft, keine Religion, keinen Familienstand, keine Kinder, keine Gesundheit, keine politische Haltung, kein Foto – auch nicht in "summary", "headline", "interests" oder "strengths". Interessen, die solche Merkmale verraten, weglassen.
 - Namen, Firmen und Fachbegriffe unverändert.

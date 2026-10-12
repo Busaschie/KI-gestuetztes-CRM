@@ -117,7 +117,7 @@ def test_fill_from_text_like_llama_answer():
     from agents.llm.schemas import CVProfile, fill_from_text, normalize_llm_output
 
     text = ("Max Mustermann\nmusterstr. 12 89898 München – tel: +49 151 2345678 – email: muster@de.de\n"
-            "linkedin.com/in/max-mustermann\nBeruflicher Werdegang\n")
+            "linkedin.com/in/max-mustermann\nBeruflicher Werdegang\nKI-Manager, cimdata seit 2026\n")
     raw = {"headline": "Max Mustermann", "positions": [{"title": "KI-Manager", "company": "cimdata", "start": "2026", "end": "heute"}]}
     p = fill_from_text(CVProfile.model_validate(normalize_llm_output(raw)), text)
     assert (p.first_name, p.last_name, p.email) == ("Max", "Mustermann", "muster@de.de")

@@ -2,7 +2,7 @@
 import re
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 class PositionOut(BaseModel):
@@ -66,6 +66,7 @@ class CVProfile(BaseModel):
     languages: list[LanguageOut] = []
     years_experience: int | None = None
     has_leadership: bool | None = None
+    _notes: list = PrivateAttr(default_factory=list)  # Hinweise aus dem Textabgleich – nicht Teil des Schemas
 
 
 # Obergrenzen für Listen: verhindern, dass kleine Modelle Einträge endlos wiederholen
@@ -139,6 +140,20 @@ ALIASES = {
 }
 
 
+NULL_STRINGS = {"null", "none", "n/a", "na", "-", "unknown", "unbekannt", ""}
+
+
+def _clean_nulls(value):
+    """Kleine Modelle schreiben oft "null" als Text – wird zu None bzw. aus Listen entfernt."""
+    if isinstance(value, str):
+        return None if value.strip().lower() in NULL_STRINGS else value
+    if isinstance(value, list):
+        return [v for v in (_clean_nulls(x) for x in value) if v is not None]
+    if isinstance(value, dict):
+        return {k: _clean_nulls(v) for k, v in value.items()}
+    return value
+
+
 def normalize_llm_output(raw) -> dict:
     """Fängt typische Abweichungen kleiner Modelle ab, bevor das Schema geprüft wird.
 
@@ -149,7 +164,7 @@ def normalize_llm_output(raw) -> dict:
         return {}
     while len(raw) == 1 and isinstance(next(iter(raw.values())), dict):
         raw = next(iter(raw.values()))
-    data = {ALIASES.get(k.lower(), k): v for k, v in raw.items()}
+    data = {ALIASES.get(k.lower(), k): _clean_nulls(v) for k, v in raw.items()}
     for key in ("positions", "education", "other_experience"):
         for entry in data.get(key) or []:
             if not isinstance(entry, dict):
@@ -187,6 +202,11 @@ def fill_from_text(profile: "CVProfile", text: str) -> "CVProfile":
         parts = name.split()
         profile.first_name, profile.last_name = " ".join(parts[:-1]), parts[-1]
     profile.languages = [lang for lang in profile.languages if _language_in_text(lang.name, text)]
+    from agents.tools.cv_grounding import ground_positions
+
+    edu_keys = [_norm_key(x) for e in profile.education for x in (e.institution, e.title) if x]
+    profile.positions, notes = ground_positions(profile.positions, text, edu_keys)
+    profile._notes.extend(notes)
     if profile.linkedin_url and not profile.linkedin_url.lower().startswith("http"):
         profile.linkedin_url = f"https://{profile.linkedin_url.strip()}"
     if profile.headline and profile.last_name and profile.last_name in profile.headline:
@@ -258,9 +278,14 @@ def count_date_ranges(text: str) -> int:
 
 def completeness_hint(profile: "CVProfile", text: str) -> str:
     """Hinweis, wenn deutlich weniger Einträge erkannt wurden, als der Text Zeiträume enthält (Grundsatz 8)."""
+    parts = list(profile._notes)
     ranges = count_date_ranges(text)
     found = len(profile.positions) + len(profile.education) + len(profile.other_experience)
     if ranges - found >= 2:
-        return (f"Hinweis: {ranges} Zeiträume im Text, aber nur {found} Stationen/Ausbildungen erkannt "
-                f"({len(profile.positions)} Berufsstationen) – bitte prüfen")
-    return ""
+        parts.append(f"{ranges} Zeiträume im Text, aber nur {found} Stationen/Ausbildungen erkannt "
+                     f"({len(profile.positions)} Berufsstationen) – bitte prüfen")
+    return ("Hinweis: " + "; ".join(parts)) if parts else ""
+
+
+def _norm_key(s: str) -> str:
+    return re.sub(r"[^\w]+", " ", s.lower()).strip()
