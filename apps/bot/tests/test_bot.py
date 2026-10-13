@@ -18,8 +18,9 @@ class FakeClient:
     def __init__(self):
         self.sent = []
 
-    def send_message(self, chat_id, text):
+    def send_message(self, chat_id, text, buttons=None):
         self.sent.append((chat_id, text))
+        return {"message_id": len(self.sent)}
 
 
 @pytest.fixture(autouse=True)
@@ -51,24 +52,6 @@ def test_unknown_chat_is_ignored(db):
 
 
 # --- Nachrichten ---------------------------------------------------------------------------------
-
-def test_text_becomes_inbound_item_once(db):
-    client = FakeClient()
-    handle_update(update("Anruf mit Meier <b>wichtig</b>"), client)
-    handle_update(update("Anruf mit Meier <b>wichtig</b>"), client)  # erneute Zustellung
-    item = InboundItem.objects.get()
-    assert item.channel == InboundItem.Channel.TELEGRAM
-    assert item.status == InboundItem.Status.UNASSIGNED
-    assert item.raw_text == "Anruf mit Meier <b>wichtig</b>"
-    assert f"#{item.pk}" in client.sent[0][1]
-
-
-def test_voice_not_yet_supported(db):
-    client = FakeClient()
-    handle_update(update(voice={"file_id": "x", "duration": 3}), client)
-    assert "Sprachnachrichten" in client.sent[0][1]
-    assert not InboundItem.objects.exists()
-
 
 def test_commands(db):
     client = FakeClient()

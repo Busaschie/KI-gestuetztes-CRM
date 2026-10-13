@@ -118,3 +118,11 @@ DOCUSEAL_WEBHOOK_SECRET = env("DOCUSEAL_WEBHOOK_SECRET", default="")  # leer = W
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_ALLOWED_CHAT_IDS = env.list("TELEGRAM_ALLOWED_CHAT_IDS", cast=int, default=[])  # leer = niemand freigeschaltet
 TELEGRAM_BRIEFING_TIME = env("TELEGRAM_BRIEFING_TIME", default="07:30")  # Ortszeit (TIME_ZONE)
+TELEGRAM_ASYNC = env.bool("TELEGRAM_ASYNC", default=False)  # True = Verarbeitung über qcluster (Bot bleibt reaktionsfähig)
+
+# Sprache → Text (Sprachnachrichten): mistral (Betrieb, EU) | whisper (lokal) | fake
+TRANSCRIBE_PROVIDER = env("TRANSCRIBE_PROVIDER", default="whisper")
+TRANSCRIBE_LANGUAGE = env("TRANSCRIBE_LANGUAGE", default="")  # leer = automatisch erkennen (de/ro/en)
+MISTRAL_TRANSCRIBE_MODEL = env("MISTRAL_TRANSCRIBE_MODEL", default="voxtral-mini-latest")
+TRANSCRIBE_NAME_HINTS = env.int("TRANSCRIBE_NAME_HINTS", default=50)  # zuletzt bearbeitete Personen als Namenshinweis
+WHISPER_MODEL = env("WHISPER_MODEL", default="small")  # tiny | base | small | medium – größer = genauer, langsamer

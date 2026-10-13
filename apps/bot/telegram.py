@@ -31,7 +31,7 @@ class TelegramClient:
         return self._call("getMe")
 
     def get_updates(self, offset: int | None = None, timeout: int = 50) -> list[dict]:
-        params = {"timeout": timeout, "allowed_updates": ["message"]}
+        params = {"timeout": timeout, "allowed_updates": ["message", "callback_query"]}
         if offset is not None:
             params["offset"] = offset
         return self._call("getUpdates", http_timeout=timeout + 10, **params)
@@ -40,7 +40,41 @@ class TelegramClient:
         """Befehlsmenü in der Telegram-App (Schaltfläche „Menü“ bzw. Vorschläge bei „/“)."""
         self._call("setMyCommands", commands=[{"command": c, "description": d} for c, d in commands])
 
-    def send_message(self, chat_id: int, text: str) -> None:
-        if len(text) > MAX_LEN:
-            text = text[: MAX_LEN - 20] + "\n… (gekürzt)"
-        self._call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML", disable_web_page_preview=True)
+    def send_message(self, chat_id: int, text: str, buttons: list[list[tuple[str, str]]] | None = None) -> dict:
+        """buttons: Zeilen von (Beschriftung, callback_data) – erscheinen als Knöpfe unter der Nachricht."""
+        params = {"chat_id": chat_id, "text": _shorten(text), "parse_mode": "HTML", "disable_web_page_preview": True}
+        if buttons:
+            params["reply_markup"] = _keyboard(buttons)
+        return self._call("sendMessage", **params)
+
+    def edit_message(self, chat_id: int, message_id: int, text: str,
+                     buttons: list[list[tuple[str, str]]] | None = None) -> None:
+        params = {"chat_id": chat_id, "message_id": message_id, "text": _shorten(text), "parse_mode": "HTML",
+                  "disable_web_page_preview": True, "reply_markup": _keyboard(buttons or [])}
+        try:
+            self._call("editMessageText", **params)
+        except TelegramError as e:
+            if "message is not modified" not in str(e):
+                raise
+
+    def answer_callback(self, callback_id: str, text: str = "") -> None:
+        self._call("answerCallbackQuery", callback_query_id=callback_id, text=text)
+
+    def download_file(self, file_id: str) -> tuple[bytes, str]:
+        """Lädt eine Datei (z. B. Sprachnachricht) herunter. Gibt (Inhalt, Dateiname) zurück."""
+        info = self._call("getFile", file_id=file_id)
+        path = info["file_path"]
+        try:
+            resp = httpx.get(f"{API}/file/bot{self.token}/{path}", timeout=60)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            raise TelegramError(f"Download fehlgeschlagen: {type(e).__name__}") from e
+        return resp.content, path.rsplit("/", 1)[-1]
+
+
+def _shorten(text: str) -> str:
+    return text if len(text) <= MAX_LEN else text[: MAX_LEN - 20] + "\n… (gekürzt)"
+
+
+def _keyboard(buttons: list[list[tuple[str, str]]]) -> dict:
+    return {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons]}

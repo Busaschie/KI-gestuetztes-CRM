@@ -17,6 +17,9 @@ class Command(BaseCommand):
     help = "Startet den Telegram-Bot (Long-Polling)"
 
     def handle(self, *args, **opts):
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+        for noisy in ("httpx", "httpcore", "faster_whisper"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
         try:
             client = TelegramClient()
             me = client.get_me()
@@ -50,9 +53,13 @@ class Command(BaseCommand):
 
     def _show(self, update):
         """Kurze Konsolenausgabe je Nachricht – ohne Inhalt (Datenschutz), nur Typ und Chat-ID."""
+        if cb := update.get("callback_query"):
+            chat_id = ((cb.get("message") or {}).get("chat") or {}).get("id")
+            self.stdout.write(f"Knopf: {cb.get('data', '')} von Chat {chat_id}")
+            return
         msg = update.get("message") or {}
         chat_id = (msg.get("chat") or {}).get("id")
         kind = "Befehl " + msg["text"].split()[0] if msg.get("text", "").startswith("/") else \
-            "Sprachnachricht" if "voice" in msg else "Text" if "text" in msg else "Sonstiges"
+            "Sprachnachricht" if "voice" in msg or "audio" in msg else "Text" if "text" in msg else "Sonstiges"
         state = "freigeschaltet" if chat_id and is_allowed(chat_id) else "nicht freigeschaltet"
         self.stdout.write(f"Eingang: {kind} von Chat {chat_id} ({state})")
