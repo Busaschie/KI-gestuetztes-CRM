@@ -4,6 +4,8 @@ Verträge (P1 Punkt 4): Versand über den Signaturdienst, Webhook-Verarbeitung, 
 Die harte Sperre selbst sitzt in Mandate.has_signed_contract und OutboundMessage.save().
 """
 import logging
+from datetime import timedelta
+from html import escape
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -36,9 +38,20 @@ def contract_values(contract: Contract) -> dict:
     }
 
 
-def send_contract(contract: Contract) -> Contract:
-    if contract.status != Contract.Status.DRAFT:
-        raise ContractError(f"Nur Entwürfe können versendet werden (Status: {contract.get_status_display()}).")
+def notify(text: str, buttons=None) -> None:
+    """Hinweis an Sandra per Telegram – darf nie den Vertragsablauf stören."""
+    if not (settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_ALLOWED_CHAT_IDS):
+        return
+    try:
+        from apps.bot.telegram import TelegramClient
+        client = TelegramClient()
+        for chat_id in settings.TELEGRAM_ALLOWED_CHAT_IDS:
+            client.send_message(chat_id, text, buttons)
+    except Exception as e:  # noqa: BLE001 – Benachrichtigung ist nur Zusatz
+        log.warning("Telegram-Hinweis nicht gesendet: %s", e)
+
+
+def _check_sendable(contract: Contract):
     if contract.needs_approval and not contract.approved_at:
         raise ContractError("Der Vertrag weicht von der Vorlage ab und muss erst freigegeben werden.")
     signer = contract.get_signer()
@@ -46,6 +59,62 @@ def send_contract(contract: Contract) -> Contract:
         raise ContractError("Kein Unterzeichner mit E-Mail-Adresse (Unterzeichner oder Ansprechpartner des Auftrags).")
     if settings.SIGNATURE_PROVIDER != "fake" and not settings.DOCUSEAL_TEMPLATE_ID:
         raise ContractError("DOCUSEAL_TEMPLATE_ID fehlt in der .env.")
+    return signer
+
+
+def schedule_contract(contract: Contract) -> Contract:
+    """Versand vormerken: Nach CONTRACT_STOP_MINUTES geht der Vertrag raus, bis dahin kann Sandra stoppen."""
+    if contract.status != Contract.Status.DRAFT:
+        raise ContractError(f"Nur Entwürfe können versendet werden (Status: {contract.get_status_display()}).")
+    signer = _check_sendable(contract)
+    minutes = settings.CONTRACT_STOP_MINUTES
+    if minutes <= 0:
+        return send_contract(contract)
+    contract.status = Contract.Status.SCHEDULED
+    contract.scheduled_for = timezone.now() + timedelta(minutes=minutes)
+    contract.save(update_fields=["status", "scheduled_for", "updated_at"])
+    when = timezone.localtime(contract.scheduled_for)
+    ContractEvent.objects.create(contract=contract, kind="scheduled", message=f"Versand geplant für {when:%d.%m.%Y %H:%M}")
+    notify(
+        f"📄 <b>Vertrag geht um {when:%H:%M} raus</b>\n{escape(str(contract.mandate))}\n"
+        f"An: {escape(str(signer))} &lt;{escape(signer.email)}&gt;\n"
+        f"Honorar: {contract.fee_model.percent:g} %" + (f"\nAbweichungen: {escape(contract.deviations)}" if contract.deviations else ""),
+        [[("⛔ Stoppen", f"c{contract.pk}:stop"), ("📤 Jetzt senden", f"c{contract.pk}:now")]],
+    )
+    return contract
+
+
+def stop_contract(contract: Contract) -> Contract:
+    if contract.status != Contract.Status.SCHEDULED:
+        raise ContractError(f"Nur geplante Verträge können gestoppt werden (Status: {contract.get_status_display()}).")
+    contract.status, contract.scheduled_for = Contract.Status.DRAFT, None
+    contract.save(update_fields=["status", "scheduled_for", "updated_at"])
+    ContractEvent.objects.create(contract=contract, kind="stopped", message="Versand gestoppt")
+    return contract
+
+
+def send_due_contracts() -> int:
+    """Läuft jede Minute (django-q): geplante Verträge versenden, deren Stopp-Fenster abgelaufen ist."""
+    due = Contract.objects.filter(status=Contract.Status.SCHEDULED, scheduled_for__lte=timezone.now())
+    sent = 0
+    for contract in due:
+        try:
+            send_contract(contract)
+            sent += 1
+            notify(f"📤 Vertrag versendet: {escape(str(contract.mandate))}")
+        except ContractError as e:
+            contract.status, contract.scheduled_for = Contract.Status.DRAFT, None
+            contract.save(update_fields=["status", "scheduled_for", "updated_at"])
+            notify(f"⚠️ Vertrag <b>nicht</b> versendet: {escape(str(contract.mandate))}\n{escape(str(e))}\n"
+                   "Zurück auf Entwurf – bitte im Admin prüfen.")
+    return sent
+
+
+def send_contract(contract: Contract) -> Contract:
+    """Sofortiger Versand (nach Ablauf des Stopp-Fensters oder per „Jetzt senden“)."""
+    if contract.status not in (Contract.Status.DRAFT, Contract.Status.SCHEDULED):
+        raise ContractError(f"Nur Entwürfe können versendet werden (Status: {contract.get_status_display()}).")
+    signer = _check_sendable(contract)
 
     try:
         result = get_signature_provider().create_submission(
@@ -64,6 +133,8 @@ def send_contract(contract: Contract) -> Contract:
     with transaction.atomic():
         contract.signature_provider_id = result.submission_id
         contract.signing_url = result.signing_url
+        contract.signature_submitter_id = result.submitter_id
+        contract.scheduled_for = None
         contract.status = Contract.Status.SENT
         contract.sent_at = now
         contract.save()
@@ -141,3 +212,41 @@ def fetch_signed_document(contract_id: int, url: str) -> None:
         raise
     contract.document.save(f"vertrag-{contract.pk}-unterschrieben.pdf", ContentFile(data), save=True)
     ContractEvent.objects.create(contract=contract, kind="document_saved", message=contract.document.name)
+
+
+def send_contract_reminders(now=None) -> int:
+    """Täglich (django-q): Erinnerung an den Kunden nach CONTRACT_REMINDER_DAYS (z. B. 3 und 7 Tage nach Versand).
+    Automatisch erlaubt (Vertragsversand ist Ausnahme vom Freigabe-Grundsatz), wird protokolliert."""
+    now = now or timezone.now()
+    days = sorted(settings.CONTRACT_REMINDER_DAYS)
+    waiting = Contract.objects.filter(
+        status__in=[Contract.Status.SENT, Contract.Status.PENDING], sent_at__isnull=False, reminders_sent__lt=len(days),
+    ).select_related("mandate", "signer", "mandate__contact_person")
+    count = 0
+    for contract in waiting:
+        if now < contract.sent_at + timedelta(days=days[contract.reminders_sent]):
+            continue
+        try:
+            get_signature_provider().remind(contract.signature_submitter_id)
+        except SignatureError as e:
+            ContractEvent.objects.create(contract=contract, kind="reminder_failed", message=str(e))
+            notify(f"⚠️ Vertragserinnerung fehlgeschlagen: {escape(str(contract.mandate))}\n{escape(str(e))}")
+            continue
+        signer = contract.get_signer()
+        with transaction.atomic():
+            contract.reminders_sent += 1
+            contract.last_reminder_at = now
+            contract.save(update_fields=["reminders_sent", "last_reminder_at", "updated_at"])
+            ContractEvent.objects.create(contract=contract, kind="reminder",
+                                         message=f"{contract.reminders_sent}. Erinnerung an {signer}")
+            if signer:
+                OutboundMessage.objects.create(
+                    kind=OutboundMessage.Kind.CONTRACT_REMINDER, status=OutboundMessage.Status.SENT,
+                    recipient=signer, mandate=contract.mandate, subject=f"Erinnerung Vertrag: {contract.mandate}",
+                    body=f"{contract.reminders_sent}. Erinnerung über E-Signatur-Dienst", is_automatic=True, sent_at=now,
+                )
+        if contract.reminders_sent == len(days):
+            notify(f"📄 Letzte automatische Erinnerung gesendet, Vertrag noch offen: {escape(str(contract.mandate))}\n"
+                   "Bitte persönlich nachfassen.")
+        count += 1
+    return count

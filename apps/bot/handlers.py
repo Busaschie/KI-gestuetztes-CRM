@@ -41,7 +41,11 @@ def handle_update(update: dict, client) -> None:
     if cb := update.get("callback_query"):
         chat_id = ((cb.get("message") or {}).get("chat") or {}).get("id")
         if chat_id and is_allowed(chat_id):
-            handle_callback(cb, client)
+            if cb.get("data", "").startswith("c"):
+                from .contracts import handle_contract_callback
+                handle_contract_callback(cb, client)
+            else:
+                handle_callback(cb, client)
         return
     msg = update.get("message")
     if not msg or "chat" not in msg:

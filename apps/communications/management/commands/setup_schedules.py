@@ -8,12 +8,15 @@ from django_q.models import Schedule
 SCHEDULES = [
     # (Name, Funktion, Minuten)
     ("CV-Postfach abrufen", "apps.communications.tasks.fetch_cv_mailbox", 5),
+    ("Verträge: geplanten Versand ausführen", "apps.clients.services.send_due_contracts", 1),
 ]
 
 
 DAILY = [
     # (Name, Funktion, Uhrzeit HH:MM aus den Einstellungen)
     ("Telegram-Briefing", "apps.bot.briefing.send_daily_briefing", lambda: settings.TELEGRAM_BRIEFING_TIME),
+    ("Verträge: Erinnerungen an Kunden", "apps.clients.services.send_contract_reminders",
+     lambda: settings.CONTRACT_REMINDER_TIME),
 ]
 
 

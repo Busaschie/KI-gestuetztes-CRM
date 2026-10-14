@@ -32,7 +32,21 @@ class DocuSealProvider(SignatureProvider):
         if not isinstance(submitters, list) or not submitters:
             raise SignatureError(f"Unerwartete Antwort von DocuSeal: {str(submitters)[:300]}")
         first = submitters[0]
-        return SubmissionResult(submission_id=str(first["submission_id"]), signing_url=first.get("embed_src") or "")
+        return SubmissionResult(submission_id=str(first["submission_id"]), signing_url=first.get("embed_src") or "",
+                                submitter_id=str(first.get("id") or ""))
+
+    def remind(self, submitter_id):
+        """PUT /submitters/{id} mit send_email=true – DocuSeal schickt die Einladung erneut."""
+        if not submitter_id:
+            raise SignatureError("Keine Unterzeichner-ID gespeichert – Erinnerung nicht möglich")
+        try:
+            resp = httpx.put(f"{self.api_url}/submitters/{submitter_id}", json={"send_email": True},
+                             headers=self.headers, timeout=self.timeout)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise SignatureError(f"DocuSeal {e.response.status_code}: {e.response.text[:300]}") from e
+        except httpx.HTTPError as e:
+            raise SignatureError(f"DocuSeal nicht erreichbar: {e}") from e
 
     def download(self, url):
         try:

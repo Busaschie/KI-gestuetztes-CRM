@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.clients.models import Contract
 from apps.communications.models import FollowUp, InboundItem
+from apps.jobs.models import Mandate
 
 log = logging.getLogger(__name__)
 
@@ -51,8 +52,19 @@ def build_briefing(today=None) -> str:
     )
     if contracts:
         def fmt_c(c):
-            return f"• {escape(str(c.mandate))} – versendet {timezone.localtime(c.sent_at):%d.%m.}"
+            rem = f", {c.reminders_sent} Erinnerung(en)" if c.reminders_sent else ""
+            return f"• {escape(str(c.mandate))} – versendet {timezone.localtime(c.sent_at):%d.%m.}{rem}"
         parts += ["", f"<b>Verträge ohne Unterschrift ({len(contracts)})</b>", *_lines(contracts, fmt_c)]
+
+    # Aufträge, die laufen, aber noch gar keinen Vertrag auf dem Weg haben (Versand am System vorbei möglich)
+    on_the_way = [Contract.Status.SCHEDULED, Contract.Status.SENT, Contract.Status.PENDING, *Contract.SIGNED_STATES]
+    no_contract = list(
+        Mandate.objects.filter(status=Mandate.Status.ACTIVE).exclude(contracts__status__in=on_the_way)
+        .select_related("company").distinct()
+    )
+    if no_contract:
+        parts += ["", f"<b>Aktive Aufträge ohne Vertrag ({len(no_contract)})</b>",
+                  *_lines(no_contract, lambda m: f"• {escape(str(m))}")]
 
     if len(parts) == 1:
         parts += ["", "Heute nichts Dringendes. 👍"]

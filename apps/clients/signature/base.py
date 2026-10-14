@@ -9,6 +9,7 @@ class SignatureError(Exception):
 class SubmissionResult:
     submission_id: str
     signing_url: str = ""
+    submitter_id: str = ""
 
 
 class SignatureProvider:
@@ -17,4 +18,8 @@ class SignatureProvider:
         raise NotImplementedError
 
     def download(self, url: str) -> bytes:
+        raise NotImplementedError
+
+    def remind(self, submitter_id: str) -> None:
+        """Signatur-Einladung an den Unterzeichner erneut senden."""
         raise NotImplementedError

@@ -23,6 +23,7 @@ class FeeModel(TimeStampedModel):
 class Contract(TimeStampedModel):
     class Status(models.TextChoices):
         DRAFT = "draft", "Entwurf"
+        SCHEDULED = "scheduled", "Geplant (Stopp möglich)"
         SENT = "sent", "Versendet"
         PENDING = "pending", "Unterschrift ausständig"
         SIGNED = "signed", "Unterschrieben"
@@ -46,13 +47,17 @@ class Contract(TimeStampedModel):
         verbose_name="Unterzeichner", help_text="Leer = Ansprechpartner des Auftrags",
     )
     approved_at = models.DateTimeField("Abweichungen freigegeben am", null=True, blank=True)
+    scheduled_for = models.DateTimeField("Versand geplant für", null=True, blank=True,
+                                         help_text="Bis dahin kann der Versand gestoppt werden")
     signature_provider_id = models.CharField("ID beim E-Signatur-Dienst", max_length=255, blank=True, db_index=True)
+    signature_submitter_id = models.CharField("ID des Unterzeichners beim Dienst", max_length=255, blank=True)
     signing_url = models.URLField("Link zur Unterschrift", max_length=500, blank=True)
     declined_at = models.DateTimeField("Abgelehnt am", null=True, blank=True)
     decline_reason = models.TextField("Ablehnungsgrund", blank=True)
     sent_at = models.DateTimeField("Versendet am", null=True, blank=True)
     signed_at = models.DateTimeField("Unterschrieben am", null=True, blank=True)
     reminders_sent = models.PositiveSmallIntegerField("Erinnerungen gesendet", default=0)
+    last_reminder_at = models.DateTimeField("Letzte Erinnerung", null=True, blank=True)
     document = models.FileField("Vertragsdokument", upload_to="contracts/", blank=True)
 
     class Meta:

@@ -126,3 +126,8 @@ TRANSCRIBE_LANGUAGE = env("TRANSCRIBE_LANGUAGE", default="")  # leer = automatis
 MISTRAL_TRANSCRIBE_MODEL = env("MISTRAL_TRANSCRIBE_MODEL", default="voxtral-mini-latest")
 TRANSCRIBE_NAME_HINTS = env.int("TRANSCRIBE_NAME_HINTS", default=50)  # zuletzt bearbeitete Personen als Namenshinweis
 WHISPER_MODEL = env("WHISPER_MODEL", default="small")  # tiny | base | small | medium – größer = genauer, langsamer
+
+# Verträge: Stopp-Fenster vor dem Versand und Erinnerungen an den Kunden (P1 Punkt 4)
+CONTRACT_STOP_MINUTES = env.int("CONTRACT_STOP_MINUTES", default=60)  # 0 = sofort senden
+CONTRACT_REMINDER_DAYS = env.list("CONTRACT_REMINDER_DAYS", cast=int, default=[3, 7])  # Tage nach Versand
+CONTRACT_REMINDER_TIME = env("CONTRACT_REMINDER_TIME", default="09:00")  # tägliche Prüfung (Ortszeit)

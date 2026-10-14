@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import Contract, ContractEvent, FeeModel
-from .services import ContractError, send_contract
+from .services import ContractError, schedule_contract, send_contract, stop_contract
 
 
 @admin.register(FeeModel)
@@ -24,30 +24,53 @@ class ContractEventInline(admin.TabularInline):
 
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
-    list_display = ["mandate", "company", "fee_model", "status", "sent_at", "signed_at"]
+    list_display = ["mandate", "company", "fee_model", "status", "scheduled_for", "sent_at", "reminders_sent", "signed_at"]
     list_filter = ["status"]
     autocomplete_fields = ["mandate", "company", "signer"]
     readonly_fields = [
-        "approved_at", "signature_provider_id", "signing_link", "sent_at", "signed_at",
-        "declined_at", "decline_reason", "reminders_sent",
+        "approved_at", "scheduled_for", "signature_provider_id", "signing_link", "sent_at", "signed_at",
+        "declined_at", "decline_reason", "reminders_sent", "last_reminder_at",
     ]
     fieldsets = [
         (None, {"fields": ["mandate", "company", "fee_model", "signer", "status"]}),
         ("Abweichungen", {"fields": ["deviations", "approved_at"]}),
         ("Unterschrift", {"fields": [
-            "signature_provider_id", "signing_link", ("sent_at", "signed_at"),
-            ("declined_at", "decline_reason"), "reminders_sent", "document",
+            "scheduled_for", "signature_provider_id", "signing_link", ("sent_at", "signed_at"),
+            ("declined_at", "decline_reason"), ("reminders_sent", "last_reminder_at"), "document",
         ]}),
     ]
     inlines = [ContractEventInline]
-    actions = ["action_send", "action_approve"]
+    actions = ["action_send", "action_stop", "action_send_now", "action_approve"]
 
     @admin.display(description="Link zur Unterschrift")
     def signing_link(self, obj):
         return format_html('<a href="{}" target="_blank">{}</a>', obj.signing_url, obj.signing_url) if obj.signing_url else "–"
 
-    @admin.action(description="Zur Unterschrift senden (DocuSeal)")
+    @admin.action(description="Zur Unterschrift senden (mit Stopp-Fenster)")
     def action_send(self, request, queryset):
+        for contract in queryset:
+            try:
+                schedule_contract(contract)
+                if contract.scheduled_for:
+                    when = timezone.localtime(contract.scheduled_for)
+                    self.message_user(request, f"{contract}: Versand geplant für {when:%H:%M} (Stopp bis dahin möglich).",
+                                      messages.SUCCESS)
+                else:
+                    self.message_user(request, f"{contract}: versendet.", messages.SUCCESS)
+            except ContractError as e:
+                self.message_user(request, f"{contract}: {e}", messages.ERROR)
+
+    @admin.action(description="Geplanten Versand stoppen")
+    def action_stop(self, request, queryset):
+        for contract in queryset:
+            try:
+                stop_contract(contract)
+                self.message_user(request, f"{contract}: gestoppt.", messages.SUCCESS)
+            except ContractError as e:
+                self.message_user(request, f"{contract}: {e}", messages.ERROR)
+
+    @admin.action(description="Sofort senden (ohne Stopp-Fenster)")
+    def action_send_now(self, request, queryset):
         for contract in queryset:
             try:
                 send_contract(contract)
