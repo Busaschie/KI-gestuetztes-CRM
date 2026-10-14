@@ -38,7 +38,11 @@ class TelegramClient:
 
     def set_commands(self, commands: list[tuple[str, str]]) -> None:
         """Befehlsmenü in der Telegram-App (Schaltfläche „Menü“ bzw. Vorschläge bei „/“)."""
-        self._call("setMyCommands", commands=[{"command": c, "description": d} for c, d in commands])
+        cmds = [{"command": c, "description": d} for c, d in commands]
+        # Telegram zeigt die spezifischste Liste an: Standard UND „private Chats“ setzen,
+        # sonst überdeckt eine ältere Liste (z. B. aus BotFather) die neue.
+        self._call("setMyCommands", commands=cmds)
+        self._call("setMyCommands", commands=cmds, scope={"type": "all_private_chats"})
 
     def send_message(self, chat_id: int, text: str, buttons: list[list[tuple[str, str]]] | None = None) -> dict:
         """buttons: Zeilen von (Beschriftung, callback_data) – erscheinen als Knöpfe unter der Nachricht."""

@@ -1,5 +1,5 @@
 """Etappe 2: Sprach-/Textnachricht → Vorschlag → Bestätigung per Knopf → Notiz/Wiedervorlage."""
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -196,3 +196,80 @@ def test_extract_cleans_answer(db, llm):
     data = extract_note("Nur ein Gedanke", today=date(2026, 10, 13))
     assert data == {"person_name": None, "company": None, "note": "Nur ein Gedanke",
                     "follow_up_date": None, "follow_up_text": None}
+
+
+# --- Etappe 3: Fehlerfälle, Datum, /offen, /status --------------------------------------------------
+
+def test_shift_follow_up_buttons(meier, llm):
+    llm(person_name="Eva Meier", note="Rückruf")
+    client = FakeClient()
+    handle_update(msg_update(text="Eva Meier Rückruf"), client)
+    draft = BotDraft.objects.get()
+    assert f"d{draft.pk}:f7" in client.buttons() and f"d{draft.pk}:f0" not in client.buttons()
+
+    press(client, f"d{draft.pk}:f7")
+    draft.refresh_from_db()
+    assert draft.data["follow_up_date"] == (date.today() + timedelta(days=7)).isoformat()
+    assert draft.data["follow_up_text"] == "Rückruf"
+    press(client, f"d{draft.pk}:f1", update_id=1002)
+    draft.refresh_from_db()
+    assert draft.data["follow_up_date"] == (date.today() + timedelta(days=8)).isoformat()
+    press(client, f"d{draft.pk}:f0", update_id=1003)
+    press(client, f"d{draft.pk}:ok", update_id=1004)
+    assert Note.objects.exists() and not FollowUp.objects.exists()
+
+
+def test_recover_stuck_and_retry(meier, llm):
+    from apps.bot.processing import recover_stuck
+
+    llm(person_name="Eva Meier", note="Nach Neustart")
+    item = InboundItem.objects.create(channel=InboundItem.Channel.TELEGRAM, raw_text="Eva Meier", external_id="x1")
+    draft = BotDraft.objects.create(chat_id=ME, inbound=item)  # hängt in „In Verarbeitung“
+    client = FakeClient()
+    assert recover_stuck(client) == 1
+    draft.refresh_from_db()
+    assert draft.status == BotDraft.Status.FAILED and "unterbrochen" in client.sent[-1][1]
+    assert f"d{draft.pk}:retry" in client.buttons()
+
+    press(client, f"d{draft.pk}:retry")
+    draft.refresh_from_db()
+    assert draft.status == BotDraft.Status.AWAITING and draft.person == meier
+
+
+def test_send_failure_keeps_draft_for_offen(meier, llm):
+    from apps.bot.telegram import TelegramError
+
+    class FlakyClient(FakeClient):
+        fail = True
+
+        def send_message(self, chat_id, text, buttons=None):
+            if self.fail and buttons:
+                raise TelegramError("Telegram nicht erreichbar")
+            return super().send_message(chat_id, text, buttons)
+
+    llm(person_name="Eva Meier", note="x")
+    client = FlakyClient()
+    handle_update(msg_update(text="Eva Meier x"), client)
+    draft = BotDraft.objects.get()
+    assert draft.status == BotDraft.Status.AWAITING and draft.message_id is None
+
+    client.fail = False
+    handle_update(msg_update(message_id=2, text="/offen"), client)
+    assert "1 offene Vorschläge" in client.sent[-2][1]
+    assert f"d{draft.pk}:ok" in client.buttons()
+
+
+def test_offen_empty_and_status(db):
+    client = FakeClient()
+    handle_update(msg_update(text="/offen"), client)
+    handle_update(msg_update(message_id=2, text="/status"), client)
+    assert "Keine offenen" in client.sent[0][1]
+    assert "Spracherkennung: fake" in client.sent[1][1] and "Briefing täglich" in client.sent[1][1]
+
+
+def test_confirmation_also_sent_at_bottom(meier, llm):
+    llm(person_name="Eva Meier", note="Vorlage senden")
+    client = FakeClient()
+    handle_update(msg_update(text="Eva Meier Vorlage"), client)
+    press(client, f"d{BotDraft.objects.get().pk}:ok")
+    assert client.sent[-1][1].startswith("✅ Gespeichert") and "Eva Meier" in client.sent[-1][1]

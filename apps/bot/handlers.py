@@ -8,13 +8,15 @@ from apps.communications.models import InboundItem
 
 from .briefing import build_briefing
 from .models import BotDraft
-from .processing import handle_callback, process_draft
+from .processing import handle_callback, process_draft, show_open
 
 log = logging.getLogger(__name__)
 
 HELP = (
     "<b>Befehle</b>\n"
     "/briefing – aktuelles Briefing\n"
+    "/offen – unbestätigte Vorschläge erneut anzeigen\n"
+    "/status – Einstellungen des Bots\n"
     "/id – deine Chat-ID\n"
     "/hilfe – diese Übersicht\n\n"
     "Sprach- oder Textnachricht schicken, z. B. „Mit Eva Meier telefoniert, will nächste Woche Rückmeldung“. "
@@ -24,6 +26,8 @@ HELP = (
 
 COMMANDS = [
     ("briefing", "Aktuelles Briefing"),
+    ("offen", "Unbestätigte Vorschläge anzeigen"),
+    ("status", "Einstellungen des Bots"),
     ("id", "Eigene Chat-ID anzeigen"),
     ("hilfe", "Befehlsübersicht"),
 ]
@@ -54,10 +58,14 @@ def handle_update(update: dict, client) -> None:
         log.warning("Telegram: Nachricht von nicht freigegebener Chat-ID %s ignoriert", chat_id)
         return
 
-    if command in ("/hilfe", "/help"):
+    if command in ("/", "/hilfe", "/help"):
         client.send_message(chat_id, HELP)
     elif command == "/briefing":
         client.send_message(chat_id, build_briefing())
+    elif command == "/offen":
+        show_open(chat_id, client)
+    elif command == "/status":
+        client.send_message(chat_id, status_text())
     elif command:
         client.send_message(chat_id, "Unbekannter Befehl. /hilfe zeigt alle Befehle.")
     elif "voice" in msg or "audio" in msg:
@@ -104,3 +112,23 @@ def _save_voice(msg: dict, chat_id: int, client) -> InboundItem | None:
     item.attachment.save(filename, ContentFile(data), save=False)  # Original bleibt erhalten
     item.save()
     return item
+
+
+def status_text() -> str:
+    """Aktuelle Einstellungen – geändert werden sie in der .env (danach Bot neu starten)."""
+    llm = settings.LLM_PROVIDER
+    llm_model = {"mistral": settings.MISTRAL_MODEL, "ollama": settings.OLLAMA_MODEL}.get(llm, "–")
+    tr = settings.TRANSCRIBE_PROVIDER
+    tr_model = {"whisper": settings.WHISPER_MODEL, "mistral": settings.MISTRAL_TRANSCRIBE_MODEL}.get(tr, "–")
+    open_count = BotDraft.objects.filter(status=BotDraft.Status.AWAITING).count()
+    failed_count = BotDraft.objects.filter(status=BotDraft.Status.FAILED).count()
+    return (
+        "<b>Einstellungen</b>\n"
+        f"Sprachmodell: {llm} ({llm_model})\n"
+        f"Spracherkennung: {tr} ({tr_model}), Sprache: {settings.TRANSCRIBE_LANGUAGE or 'automatisch'}, "
+        f"Namenshinweise: {settings.TRANSCRIBE_NAME_HINTS}\n"
+        f"Briefing täglich: {settings.TELEGRAM_BRIEFING_TIME} ({settings.TIME_ZONE})\n"
+        f"Verarbeitung: {'über qcluster' if settings.TELEGRAM_ASYNC else 'direkt im Bot'}\n"
+        f"Offene Vorschläge: {open_count}, mit Fehler: {failed_count}\n\n"
+        "<i>Ändern in der .env, danach Bot neu starten.</i>"
+    )

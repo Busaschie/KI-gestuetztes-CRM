@@ -8,6 +8,7 @@ import time
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.bot.handlers import COMMANDS, handle_update, is_allowed
+from apps.bot.processing import recover_stuck
 from apps.bot.telegram import TelegramClient, TelegramError
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,8 @@ class Command(BaseCommand):
             raise CommandError(str(e)) from e
         client.set_commands(COMMANDS)
         self.stdout.write(self.style.SUCCESS(f"Bot @{me['username']} läuft – Strg+C beendet."))
+        if n := recover_stuck(client):
+            self.stdout.write(self.style.WARNING(f"{n} unterbrochene(r) Vorschlag/Vorschläge auf Fehler gesetzt"))
 
         try:
             self._loop(client)
