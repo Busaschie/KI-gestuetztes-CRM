@@ -92,6 +92,19 @@ IMAP_PASSWORD = env("IMAP_PASSWORD", default="")
 IMAP_FOLDER = env("IMAP_FOLDER", default="INBOX")
 IMAP_PROCESSED_FOLDER = env("IMAP_PROCESSED_FOLDER", default="")  # leer = nur als gelesen markieren
 
+# Versand-Postfach (SMTP) – getrennt vom CV-Postfach; für Profile, Absagen usw. (Verträge verschickt Documenso)
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")  # lokal: Ausgabe im Terminal
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=465)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=True)  # 465 = SSL, 587 = STARTTLS (dann EMAIL_USE_TLS=True)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_TIMEOUT = 30
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="")
+EMAIL_REPLY_TO = env.list("EMAIL_REPLY_TO", default=[])  # Antworten an Sandra
+OUTBOUND_STOP_MINUTES = env.int("OUTBOUND_STOP_MINUTES", default=60)  # Stopp-Fenster für Profilversand; 0 = sofort
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))  # CV-Originale (später EU-Objektspeicher)
 

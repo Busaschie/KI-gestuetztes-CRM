@@ -44,6 +44,9 @@ def handle_update(update: dict, client) -> None:
             if cb.get("data", "").startswith("c"):
                 from .contracts import handle_contract_callback
                 handle_contract_callback(cb, client)
+            elif cb.get("data", "").startswith("o"):
+                from .outbound import handle_outbound_callback
+                handle_outbound_callback(cb, client)
             else:
                 handle_callback(cb, client)
         return

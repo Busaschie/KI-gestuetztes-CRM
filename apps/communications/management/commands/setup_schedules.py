@@ -9,6 +9,7 @@ SCHEDULES = [
     # (Name, Funktion, Minuten)
     ("CV-Postfach abrufen", "apps.communications.tasks.fetch_cv_mailbox", 5),
     ("Verträge: geplanten Versand ausführen", "apps.clients.services.send_due_contracts", 1),
+    ("Nachrichten: geplanten Versand ausführen", "apps.communications.services.send_due_messages", 1),
 ]
 
 

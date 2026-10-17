@@ -120,6 +120,10 @@ class OutboundMessage(TimeStampedModel):
     approved_at = models.DateTimeField("Freigegeben am", null=True, blank=True)
     sent_at = models.DateTimeField("Gesendet am", null=True, blank=True)
     error = models.TextField("Fehler", blank=True)
+    submissions = models.ManyToManyField(
+        "pipeline.Submission", blank=True, related_name="outbound_messages", verbose_name="Kandidaten",
+        help_text="Bei „Profil an Kunden“: vorgestellte Kandidaten (eine Mail = Shortlist)",
+    )
 
     class Meta:
         verbose_name = "Ausgehende Nachricht"
@@ -149,3 +153,23 @@ class OutboundMessage(TimeStampedModel):
     def save(self, *args, **kwargs):
         self.check_contract_lock()  # auch außerhalb des Admins (Agenten, Telegram, Skripte)
         super().save(*args, **kwargs)
+
+
+class OutboundAttachment(models.Model):
+    """Anhang einer ausgehenden Nachricht. Vorerst der Original-CV; später auch ein eigenes Profil-PDF (Feld file)."""
+    message = models.ForeignKey(OutboundMessage, on_delete=models.CASCADE, related_name="attachments")
+    cv = models.ForeignKey("candidates.CVDocument", on_delete=models.PROTECT, null=True, blank=True,
+                           related_name="+", verbose_name="Lebenslauf")
+    file = models.FileField("Datei", upload_to="outbound/%Y/%m/", blank=True)
+    filename = models.CharField("Dateiname im Anhang", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Anhang"
+        verbose_name_plural = "Anhänge"
+
+    def __str__(self):
+        return self.filename or str(self.cv or self.file)
+
+    def source(self):
+        """Die Datei, die verschickt wird."""
+        return self.file if self.file else (self.cv.file if self.cv_id else None)
