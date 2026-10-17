@@ -1,5 +1,6 @@
 """Kundenbeziehung: Honorarmodelle und Verträge (P1 Punkt 4)."""
 from django.db import models
+from django.utils import timezone
 
 from apps.contacts.models import Company, Person
 from apps.core.models import TimeStampedModel
@@ -103,4 +104,4 @@ class ContractEvent(models.Model):
         ordering = ["created_at"]
 
     def __str__(self):
-        return f"{self.created_at:%d.%m.%Y %H:%M} {self.kind}"
+        return f"{timezone.localtime(self.created_at):%d.%m.%Y %H:%M} {self.kind}"
