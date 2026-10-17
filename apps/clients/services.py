@@ -226,6 +226,53 @@ def handle_webhook(payload: dict) -> Contract | None:
     return contract
 
 
+DOCUMENSO_EVENTS = {
+    "DOCUMENT_OPENED": "opened", "DOCUMENT_SIGNED": "signed_by_one", "DOCUMENT_RECIPIENT_COMPLETED": "signed_by_one",
+    "DOCUMENT_COMPLETED": "completed", "DOCUMENT_REJECTED": "declined", "DOCUMENT_CANCELLED": "cancelled",
+}
+
+
+def handle_documenso_webhook(payload: dict) -> Contract | None:
+    """Documenso-Ereignis verarbeiten. Zuordnung über externalId („contract-<ID>“), sonst über die Envelope-ID.
+    Idempotent; unterschrieben bleibt unterschrieben."""
+    event = str(payload.get("event", ""))
+    data = payload.get("payload") or {}
+    contract = None
+    external = str(data.get("externalId") or "")
+    if external.startswith("contract-") and external[9:].isdigit():
+        contract = Contract.objects.filter(pk=int(external[9:])).first()
+    if not contract:
+        ids = {str(data.get(k)) for k in ("envelopeId", "id") if data.get(k)}
+        contract = Contract.objects.filter(signature_provider_id__in=ids).first() if ids else None
+    if not contract:
+        log.warning("Documenso-Webhook ohne passenden Vertrag: %s %s", event, external)
+        return None
+
+    ContractEvent.objects.create(contract=contract, kind=f"documenso.{event}", payload=payload)
+    if contract.is_signed:
+        return contract
+    kind, now = DOCUMENSO_EVENTS.get(event), timezone.now()
+    if kind == "completed":
+        contract.status, contract.signed_at = Contract.Status.SIGNED, now
+        contract.save()
+        ref = f"envelope:{contract.signature_provider_id}"
+        from django_q.tasks import async_task
+        transaction.on_commit(lambda: async_task("apps.clients.services.fetch_signed_document", contract.pk, ref))
+        notify(f"✅ Vertrag unterschrieben: {escape(str(contract.mandate))}")
+    elif kind == "opened" and contract.status == Contract.Status.SENT:
+        contract.status = Contract.Status.PENDING
+        contract.save()
+    elif kind == "declined":
+        contract.status, contract.declined_at = Contract.Status.DECLINED, now
+        contract.decline_reason = str(data.get("rejectionReason") or data.get("reason") or "")
+        contract.save()
+        notify(f"❌ Vertrag abgelehnt: {escape(str(contract.mandate))}")
+    elif kind == "cancelled":
+        contract.status = Contract.Status.CANCELLED
+        contract.save()
+    return contract
+
+
 def fetch_signed_document(contract_id: int, url: str) -> None:
     """Lädt das unterschriebene PDF in die eigene Ablage (Links beim Dienst laufen ab)."""
     contract = Contract.objects.get(pk=contract_id)
@@ -251,7 +298,7 @@ def send_contract_reminders(now=None) -> int:
         if now < contract.sent_at + timedelta(days=days[contract.reminders_sent]):
             continue
         try:
-            get_signature_provider().remind(contract.signature_submitter_id)
+            get_signature_provider().remind(contract.signature_submitter_id, contract.signature_provider_id)
         except SignatureError as e:
             ContractEvent.objects.create(contract=contract, kind="reminder_failed", message=str(e))
             notify(f"⚠️ Vertragserinnerung fehlgeschlagen: {escape(str(contract.mandate))}\n{escape(str(e))}")

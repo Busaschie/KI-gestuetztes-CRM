@@ -25,6 +25,6 @@ class SignatureProvider:
     def download(self, url: str) -> bytes:
         raise NotImplementedError
 
-    def remind(self, submitter_id: str) -> None:
+    def remind(self, submitter_id: str, submission_id: str = "") -> None:
         """Signatur-Einladung an den Unterzeichner erneut senden."""
         raise NotImplementedError

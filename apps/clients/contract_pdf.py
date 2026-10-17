@@ -334,7 +334,14 @@ def _signatures(cv, c, W, M, for_signature, signer_role):
             # DocuSeal-Textfeld-Tag: wird beim Hochladen zum Unterschriftsfeld und aus dem PDF entfernt
             cv.setFillColor(white)
             cv.setFont("Helvetica", 7)
-            cv.drawString(x, y + 18, "{{Unterschrift;role=%s;type=signature}}" % (signer_role or "First Party"))
+            cv.drawString(x, y + 18, signature_tag(signer_role))
+
+
+def signature_tag(signer_role: str = "") -> str:
+    """Platzhalter für das Unterschriftsfeld – Syntax je E-Signatur-Dienst verschieden."""
+    if settings.SIGNATURE_PROVIDER == "documenso":
+        return "{{signature, r1}}"
+    return "{{Unterschrift;role=%s;type=signature}}" % (signer_role or "First Party")
 
 
 # --- Hilfen ---------------------------------------------------------------------------------------

@@ -8,7 +8,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbid
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .services import handle_webhook
+from .services import handle_documenso_webhook, handle_webhook
 
 log = logging.getLogger(__name__)
 
@@ -47,3 +47,22 @@ def contract_preview(request, pk):
     resp = HttpResponse(pdf, content_type="application/pdf")
     resp["Content-Disposition"] = f'inline; filename="vertrag-{contract.pk}-vorschau.pdf"'
     return resp
+
+
+@csrf_exempt
+@require_POST
+def documenso_webhook(request):
+    """Documenso schickt das Geheimnis im Header X-Documenso-Secret (Klartext, kein HMAC)."""
+    secret = settings.DOCUMENSO_WEBHOOK_SECRET
+    given = request.headers.get("X-Documenso-Secret", "")
+    if not secret or not hmac.compare_digest(given.encode(), secret.encode()):
+        log.warning("Documenso-Webhook mit falschem oder fehlendem Geheimnis abgelehnt")
+        return HttpResponseForbidden()
+    try:
+        payload = json.loads(request.body)
+    except ValueError:
+        return HttpResponseBadRequest("Kein JSON")
+    if not isinstance(payload, dict):
+        return HttpResponseBadRequest("Kein Objekt")
+    handle_documenso_webhook(payload)
+    return HttpResponse("ok")

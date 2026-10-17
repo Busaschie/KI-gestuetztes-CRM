@@ -112,6 +112,9 @@ DOCUSEAL_API_KEY = env("DOCUSEAL_API_KEY", default="")
 DOCUSEAL_TEMPLATE_ID = env("DOCUSEAL_TEMPLATE_ID", default="")
 DOCUSEAL_SIGNER_ROLE = env("DOCUSEAL_SIGNER_ROLE", default="First Party")  # Rolle in der DocuSeal-Vorlage
 DOCUSEAL_WEBHOOK_HEADER = env("DOCUSEAL_WEBHOOK_HEADER", default="X-Docuseal-Secret")
+DOCUMENSO_API_URL = env("DOCUMENSO_API_URL", default="http://localhost:3001/api/v2")
+DOCUMENSO_API_KEY = env("DOCUMENSO_API_KEY", default="")
+DOCUMENSO_WEBHOOK_SECRET = env("DOCUMENSO_WEBHOOK_SECRET", default="")  # Header X-Documenso-Secret
 DOCUSEAL_WEBHOOK_SECRET = env("DOCUSEAL_WEBHOOK_SECRET", default="")  # leer = Webhook abgelehnt
 
 # Telegram-Bot – Kanal zu Sandra. Token nur in der .env

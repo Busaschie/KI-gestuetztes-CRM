@@ -52,7 +52,7 @@ class FakeSignatureProvider(SignatureProvider):
 
     reminded: list[str] = []
 
-    def remind(self, submitter_id):
+    def remind(self, submitter_id, submission_id=""):
         FakeSignatureProvider.reminded.append(submitter_id)
 
     def download(self, url):

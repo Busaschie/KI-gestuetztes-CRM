@@ -60,7 +60,7 @@ class DocuSealProvider(SignatureProvider):
         return SubmissionResult(submission_id=str(data["id"]), signing_url=first.get("embed_src") or "",
                                 submitter_id=str(first.get("id") or ""))
 
-    def remind(self, submitter_id):
+    def remind(self, submitter_id, submission_id=""):
         """PUT /submitters/{id} mit send_email=true – DocuSeal schickt die Einladung erneut."""
         if not submitter_id:
             raise SignatureError("Keine Unterzeichner-ID gespeichert – Erinnerung nicht möglich")
