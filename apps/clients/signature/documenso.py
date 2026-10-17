@@ -30,10 +30,7 @@ class DocumensoProvider(SignatureProvider):
             raise SignatureError(f"Documenso {resp.status_code}: {resp.text[:300]}")
         return resp
 
-    def create_submission(self, **kwargs):
-        raise SignatureError("Documenso arbeitet mit eigenem PDF – CONTRACT_SOURCE=pdf setzen")
-
-    def create_submission_from_pdf(self, *, pdf, name, role, signer_name, signer_email, external_id):
+    def create_submission_from_pdf(self, *, pdf, name, signer_name, signer_email, external_id):
         payload = {
             "type": "DOCUMENT",
             "title": name,

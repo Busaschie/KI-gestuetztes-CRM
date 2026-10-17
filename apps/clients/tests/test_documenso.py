@@ -14,7 +14,6 @@ from apps.jobs.models import Mandate
 @pytest.fixture(autouse=True)
 def cfg(settings, tmp_path):
     settings.SIGNATURE_PROVIDER = "documenso"
-    settings.CONTRACT_SOURCE = "pdf"
     settings.DOCUMENSO_API_URL = "http://documenso.test/api/v2"
     settings.DOCUMENSO_API_KEY = "api_test"
     settings.DOCUMENSO_WEBHOOK_SECRET = "geheim"

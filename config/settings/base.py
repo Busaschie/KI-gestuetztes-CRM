@@ -105,17 +105,11 @@ OLLAMA_TIMEOUT = env.int("OLLAMA_TIMEOUT", default=1800)  # Gesamtdauer pro CV i
 OLLAMA_NUM_CTX = env.int("OLLAMA_NUM_CTX", default=16384)  # Kontextgröße in Tokens
 OLLAMA_NUM_PREDICT = env.int("OLLAMA_NUM_PREDICT", default=4096)  # max. Antwortlänge in Tokens
 
-# E-Signatur – austauschbar (docuseal | fake). Zugangsdaten nur in der .env
+# E-Signatur – austauschbar (documenso | fake). Zugangsdaten nur in der .env
 SIGNATURE_PROVIDER = env("SIGNATURE_PROVIDER", default="fake")
-DOCUSEAL_API_URL = env("DOCUSEAL_API_URL", default="https://api.docuseal.eu")  # selbst gehostet: https://<host>/api
-DOCUSEAL_API_KEY = env("DOCUSEAL_API_KEY", default="")
-DOCUSEAL_TEMPLATE_ID = env("DOCUSEAL_TEMPLATE_ID", default="")
-DOCUSEAL_SIGNER_ROLE = env("DOCUSEAL_SIGNER_ROLE", default="First Party")  # Rolle in der DocuSeal-Vorlage
-DOCUSEAL_WEBHOOK_HEADER = env("DOCUSEAL_WEBHOOK_HEADER", default="X-Docuseal-Secret")
 DOCUMENSO_API_URL = env("DOCUMENSO_API_URL", default="http://localhost:3001/api/v2")
 DOCUMENSO_API_KEY = env("DOCUMENSO_API_KEY", default="")
 DOCUMENSO_WEBHOOK_SECRET = env("DOCUMENSO_WEBHOOK_SECRET", default="")  # Header X-Documenso-Secret
-DOCUSEAL_WEBHOOK_SECRET = env("DOCUSEAL_WEBHOOK_SECRET", default="")  # leer = Webhook abgelehnt
 
 # Telegram-Bot – Kanal zu Sandra. Token nur in der .env
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
@@ -140,5 +134,4 @@ CONTRACTOR_NAME = env("CONTRACTOR_NAME", default="")
 CONTRACTOR_ADDRESS = env("CONTRACTOR_ADDRESS", default="")  # Zeilen mit „|“ getrennt
 CONTRACTOR_TAX_ID = env("CONTRACTOR_TAX_ID", default="")  # z. B. „CUI: …“
 CONTRACTOR_SIGNER = env("CONTRACTOR_SIGNER", default="")  # Name in Text und Unterschriftszeile
-CONTRACT_SOURCE = env("CONTRACT_SOURCE", default="pdf")  # pdf = eigenes Vertrags-PDF | template = DocuSeal-Vorlage
 CONTRACT_GOVERNING_LAW = env("CONTRACT_GOVERNING_LAW", default="österreichisches Recht")  # offen: je Land? (felder.md)

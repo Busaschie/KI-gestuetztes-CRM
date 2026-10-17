@@ -8,7 +8,7 @@ Planung und Entscheidungen: `../work/` (uebersicht.md, entscheidungen.md, techni
 ## Technik
 - Django 5.2 LTS, PostgreSQL + pgvector (lokal per Docker), django-q2 als Warteschlange in PostgreSQL (kein Redis/Celery)
 - Sprachmodell austauschbar über `LLM_PROVIDER`: Mistral (Betrieb, EU), Ollama (lokal), Fake (Tests)
-- E-Signatur austauschbar über `SIGNATURE_PROVIDER`: DocuSeal (Betrieb), Fake (Entwicklung/Tests)
+- E-Signatur austauschbar über `SIGNATURE_PROVIDER`: Documenso (Betrieb, selbst gehostet), Fake (Entwicklung/Tests)
 - Telegram-Bot ohne Zusatzbibliothek (httpx, Long-Polling)
 - Konfiguration nur über Umgebungsvariablen (`.env`, Vorlage `.env.example`)
 
@@ -16,10 +16,11 @@ Planung und Entscheidungen: `../work/` (uebersicht.md, entscheidungen.md, techni
 - [x] Datenmodell: Personen, Unternehmen, Kandidaten, Aufträge, Pipeline, Kommunikation, Datenschutz
 - [x] CV-Auslese (PDF, Word, Scan) mit Schutzregeln, IMAP-Abruf des CV-Postfachs alle 5 min, Referenztest
 - [x] Lesbare Profilansicht im Admin
-- [x] Verträge über DocuSeal mit Webhook, Protokoll und harter Sperre für den Profilversand
+- [x] Verträge als eigenes PDF, E-Signatur über Documenso mit Webhook, Protokoll und harter Sperre für den Profilversand
 - [x] Telegram-Bot Etappe 1: Zugriffsschutz, Befehle, Text → Eingang, tägliches Briefing
 - [ ] Telegram-Bot Etappe 2: Sprachnachricht → Notiz/Wiedervorlage
-- [ ] Stopp-Fenster und Erinnerungen beim Vertragsversand, DocuSeal-Livetest
+- [x] Stopp-Fenster und Erinnerungen beim Vertragsversand
+- [ ] Documenso im Betrieb (öffentlicher Webhook), Erinnerung live testen
 - [ ] LinkedIn-Import, Kontaktpflege, Standardabsage
 
 ## Start (Windows, PyCharm-Terminal)
@@ -46,17 +47,21 @@ Ergebnis im Admin unter **Eingänge** (Status, Fehler) und **Kandidatenprofile**
 Gescannte PDFs brauchen die Mistral-Texterkennung (OCR). Echte Lebensläufe und Testdaten nie ins Repository legen.
 
 ## Verträge (E-Signatur)
-1. Im Admin Vertrag zum Auftrag anlegen; bei Abweichungen von der Vorlage Aktion „Abweichungen freigeben“.
-2. Aktion „Zur Unterschrift senden (DocuSeal)“ – Unterzeichner ist der eingetragene Unterzeichner oder der Ansprechpartner des Auftrags.
-3. DocuSeal meldet Öffnen/Unterschrift/Ablehnung an `/clients/docuseal/webhook/` (Header `X-Docuseal-Secret` = `DOCUSEAL_WEBHOOK_SECRET`); das unterschriebene PDF wird in die eigene Ablage geladen.
+Der Vertrag wird als eigenes PDF im Layout von Sandras Vorlage erzeugt (`apps/clients/contract_pdf.py`,
+Logo und Schriften in `static/contract/`) und über **Documenso** (Open Source, selbst gehostet) zur Unterschrift versendet.
+
+1. Im Admin Vertrag zum Auftrag anlegen; „📄 Vorschau öffnen“ zeigt das PDF. Bei Abweichungen Aktion „Abweichungen freigeben“.
+2. Aktion „Zur Unterschrift senden (mit Stopp-Fenster)“ – nach `CONTRACT_STOP_MINUTES` geht der Vertrag raus (Telegram: Stoppen / Jetzt senden).
+3. Documenso meldet Öffnen/Unterschrift/Ablehnung an `/clients/documenso/webhook/` (Header `X-Documenso-Secret` = `DOCUMENSO_WEBHOOK_SECRET`);
+   das unterschriebene PDF (mit Signaturprotokoll) wird in die eigene Ablage geladen. Erinnerungen nach 3/7 Tagen (`CONTRACT_REMINDER_DAYS`).
 4. Erst danach lässt sich „Profil an Kunden“ als ausgehende Nachricht freigeben oder senden – die Sperre sitzt im Modell und gilt überall.
 
-Ohne DocuSeal-Konto testen (`SIGNATURE_PROVIDER=fake`):
+Daten der Auftragnehmerin (`CONTRACTOR_*`) und Documenso-Zugang stehen in der `.env`. Lokaler Test-Server: `work\documenso\`
+(Hinweis: Documenso lehnt Webhooks an private Adressen ab – lokal Ereignisse mit `contract_webhook` nachspielen).
 
-    python manage.py contract_webhook <Vertrags-ID> form.completed
+Ohne Documenso testen (`SIGNATURE_PROVIDER=fake`):
 
-Die DocuSeal-Vorlage braucht eine Rolle (Standard „First Party“) und Felder mit den Namen
-`Kunde`, `Position`, `Einsatzort`, `Honorar`, `Garantie`, `Abweichungen`, `Datum`.
+    python manage.py contract_webhook <Vertrags-ID> DOCUMENT_COMPLETED
 
 ## Telegram-Bot
 1. Bot bei @BotFather anlegen (`/newbot`), Token als `TELEGRAM_BOT_TOKEN` in die `.env`.
@@ -94,7 +99,7 @@ Nachrichten anderer Chat-IDs werden ignoriert (nur `/start` und `/id` werden bea
 | `fetch_cvs` | CV-Postfach abrufen |
 | `import_cv` | Lebensläufe aus Datei/Ordner einlesen |
 | `cv_debug` / `cv_eval` | Auslese eines CVs prüfen / Referenztest |
-| `contract_webhook` | DocuSeal-Ereignis simulieren |
+| `contract_webhook` | Documenso-Ereignis simulieren |
 | `run_bot` | Telegram-Bot starten |
 | `test_agent` | Warteschlange mit Test-Agent prüfen |
 

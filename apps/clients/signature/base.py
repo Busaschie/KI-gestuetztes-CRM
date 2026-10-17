@@ -13,16 +13,12 @@ class SubmissionResult:
 
 
 class SignatureProvider:
-    def create_submission(self, *, template_id: str, role: str, signer_name: str, signer_email: str,
-                          values: dict, external_id: str) -> SubmissionResult:
-        raise NotImplementedError
-
-    def create_submission_from_pdf(self, *, pdf: bytes, name: str, role: str, signer_name: str, signer_email: str,
+    def create_submission_from_pdf(self, *, pdf: bytes, name: str, signer_name: str, signer_email: str,
                                    external_id: str) -> SubmissionResult:
-        """Eigenes PDF zur Unterschrift senden; das Unterschriftsfeld steht als Text-Tag im PDF."""
+        """Eigenes PDF zur Unterschrift senden; das Unterschriftsfeld steht als Platzhalter im PDF."""
         raise NotImplementedError
 
-    def download(self, url: str) -> bytes:
+    def download(self, ref: str) -> bytes:
         raise NotImplementedError
 
     def remind(self, submitter_id: str, submission_id: str = "") -> None:

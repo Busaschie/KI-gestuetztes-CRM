@@ -16,7 +16,6 @@ from apps.jobs.models import Mandate
 @pytest.fixture(autouse=True)
 def cfg(settings, tmp_path, monkeypatch):
     settings.SIGNATURE_PROVIDER = "fake"
-    settings.CONTRACT_SOURCE = "pdf"
     settings.CONTRACTOR_NAME = "Sandra Test pfa"
     settings.CONTRACTOR_ADDRESS = "Teststraße 1, RO-123 Ort|Rumänien"
     settings.CONTRACTOR_SIGNER = "Sandra Test"
@@ -57,7 +56,7 @@ def test_pdf_contains_values(contract):
 
 
 def test_signature_tag_only_for_signing(contract):
-    assert "{{Unterschrift;role=First Party;type=signature}}" in text_of(build_contract_pdf(contract, True))
+    assert "{{signature, r1}}" in text_of(build_contract_pdf(contract, True))
 
 
 def test_long_deviations_raise_clear_error(contract):

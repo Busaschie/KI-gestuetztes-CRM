@@ -1,8 +1,8 @@
 """Vertrags-PDF im Layout von Sandras Vorlage („Recruitment & Executive Search Partnership“).
 
 Je Vertrag werden Kunde, Adresse, Position, Anstellungsart, Honorar und Fristen eingesetzt.
-Mit for_signature=True steht über der Unterschriftszeile des Kunden ein DocuSeal-Textfeld-Tag
-({{…;type=signature}}), das DocuSeal beim Hochladen in ein Unterschriftsfeld umwandelt.
+Mit for_signature=True steht über der Unterschriftszeile des Kunden der (unsichtbare) Platzhalter
+{{signature, r1}}, den Documenso beim Hochladen in ein Unterschriftsfeld für Empfänger 1 umwandelt.
 """
 import io
 from html import escape
@@ -92,7 +92,7 @@ def contract_context(contract) -> dict:
     }
 
 
-def build_contract_pdf(contract, for_signature: bool = False, signer_role: str = "") -> bytes:
+def build_contract_pdf(contract, for_signature: bool = False) -> bytes:
     _register_fonts()
     c = contract_context(contract)
     buf = io.BytesIO()
@@ -107,7 +107,7 @@ def build_contract_pdf(contract, for_signature: bool = False, signer_role: str =
     _kpis(cv, c, W, H, M)
     body_top = H - 336
     _body(cv, c, W, M, body_top, bottom=62)
-    _signatures(cv, c, W, M, for_signature, signer_role)
+    _signatures(cv, c, W, M, for_signature)
     cv.showPage()
     cv.save()
     return buf.getvalue()
@@ -313,7 +313,7 @@ def _box(html, st, width):
     return t
 
 
-def _signatures(cv, c, W, M, for_signature, signer_role):
+def _signatures(cv, c, W, M, for_signature):
     gap = 22
     col_w = (W - 2 * M - gap) / 2
     y = 26
@@ -331,17 +331,13 @@ def _signatures(cv, c, W, M, for_signature, signer_role):
         cv.setFont(F["regular"], 7)
         cv.drawString(x, y - 11, sub)
         if i == 1 and for_signature:
-            # DocuSeal-Textfeld-Tag: wird beim Hochladen zum Unterschriftsfeld und aus dem PDF entfernt
+            # Platzhalter: wird beim Hochladen zum Unterschriftsfeld (Documenso blendet ihn aus)
             cv.setFillColor(white)
             cv.setFont("Helvetica", 7)
-            cv.drawString(x, y + 18, signature_tag(signer_role))
+            cv.drawString(x, y + 18, SIGNATURE_PLACEHOLDER)
 
 
-def signature_tag(signer_role: str = "") -> str:
-    """Platzhalter für das Unterschriftsfeld – Syntax je E-Signatur-Dienst verschieden."""
-    if settings.SIGNATURE_PROVIDER == "documenso":
-        return "{{signature, r1}}"
-    return "{{Unterschrift;role=%s;type=signature}}" % (signer_role or "First Party")
+SIGNATURE_PLACEHOLDER = "{{signature, r1}}"  # Documenso: Unterschriftsfeld für Empfänger 1
 
 
 # --- Hilfen ---------------------------------------------------------------------------------------

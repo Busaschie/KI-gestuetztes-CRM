@@ -5,7 +5,7 @@ import pytest
 from django.core.exceptions import ValidationError
 
 from apps.clients.models import Contract, ContractEvent, FeeModel
-from apps.clients.services import ContractError, fetch_signed_document, handle_webhook, send_contract
+from apps.clients.services import ContractError, fetch_signed_document, handle_documenso_webhook, send_contract
 from apps.communications.models import OutboundMessage
 from apps.contacts.models import Company, Person
 from apps.jobs.models import Mandate
@@ -16,8 +16,8 @@ SECRET = "s3cret"
 @pytest.fixture(autouse=True)
 def signature_settings(settings, tmp_path):
     settings.SIGNATURE_PROVIDER = "fake"
-    settings.DOCUSEAL_WEBHOOK_SECRET = SECRET
-    settings.DOCUSEAL_WEBHOOK_HEADER = "X-Docuseal-Secret"
+    settings.DOCUMENSO_WEBHOOK_SECRET = SECRET
+    settings.TELEGRAM_BOT_TOKEN = ""
     settings.MEDIA_ROOT = str(tmp_path)
 
 
@@ -37,10 +37,10 @@ def profile_message(mandate, status=OutboundMessage.Status.SENT):
     )
 
 
-def webhook(event_type, submission_id, **extra):
-    data = {"id": 99, "submission": {"id": submission_id, **extra}} if event_type.startswith("form.") \
-        else {"id": submission_id, **extra}
-    return {"event_type": event_type, "timestamp": "2026-10-11T12:00:00Z", "data": data}
+def webhook(event, contract, **extra):
+    """Ereignis im Format von Documenso (siehe Test vom 17.10.)."""
+    return {"event": event, "payload": {"externalId": f"contract-{contract.pk}",
+                                        "envelopeId": contract.signature_provider_id, **extra}}
 
 
 # --- Sperre -------------------------------------------------------------------------------------
@@ -64,7 +64,7 @@ def test_lock_requires_mandate(contract):
 
 def test_lock_opens_after_signature(contract):
     send_contract(contract)
-    handle_webhook(webhook("form.completed", contract.signature_provider_id))
+    handle_documenso_webhook(webhook("DOCUMENT_COMPLETED", contract))
     assert contract.mandate.has_signed_contract
     profile_message(contract.mandate).save()
 
@@ -106,27 +106,26 @@ def test_send_only_drafts(contract):
 
 def test_webhook_flow_and_idempotency(contract):
     send_contract(contract)
-    sid = contract.signature_provider_id
-    handle_webhook(webhook("form.viewed", sid))
+    handle_documenso_webhook(webhook("DOCUMENT_OPENED", contract))
     contract.refresh_from_db()
     assert contract.status == Contract.Status.PENDING
-    handle_webhook(webhook("submission.completed", sid))
-    handle_webhook(webhook("form.declined", sid))  # nach Unterschrift ohne Wirkung
+    handle_documenso_webhook(webhook("DOCUMENT_COMPLETED", contract))
+    handle_documenso_webhook(webhook("DOCUMENT_REJECTED", contract))  # nach Unterschrift ohne Wirkung
     contract.refresh_from_db()
     assert contract.status == Contract.Status.SIGNED and contract.signed_at
-    assert contract.events.filter(kind="form.declined").exists()  # aber protokolliert
+    assert contract.events.filter(kind="documenso.DOCUMENT_REJECTED").exists()  # aber protokolliert
 
 
 def test_webhook_declined(contract):
     send_contract(contract)
-    handle_webhook(webhook("form.declined", contract.signature_provider_id, ))
+    handle_documenso_webhook(webhook("DOCUMENT_REJECTED", contract, rejectionReason="Zu teuer"))
     contract.refresh_from_db()
     assert contract.status == Contract.Status.DECLINED
-    assert not contract.mandate.has_signed_contract
+    assert not contract.mandate.has_signed_contract and contract.decline_reason == "Zu teuer"
 
 
 def test_webhook_unknown_submission(db):
-    assert handle_webhook(webhook("form.completed", "unknown")) is None
+    assert handle_documenso_webhook({"event": "DOCUMENT_COMPLETED", "payload": {"externalId": "contract-999"}}) is None
 
 
 def test_fetch_signed_document(contract):
@@ -139,21 +138,21 @@ def test_fetch_signed_document(contract):
 
 def test_webhook_view_checks_secret(client, contract):
     send_contract(contract)
-    body = json.dumps(webhook("form.completed", contract.signature_provider_id))
-    url = "/clients/docuseal/webhook/"
+    body = json.dumps(webhook("DOCUMENT_COMPLETED", contract))
+    url = "/clients/documenso/webhook/"
     assert client.post(url, body, content_type="application/json").status_code == 403
     assert client.post(url, body, content_type="application/json",
-                       headers={"X-Docuseal-Secret": "falsch"}).status_code == 403
+                       headers={"X-Documenso-Secret": "falsch"}).status_code == 403
     assert client.post(url, body, content_type="application/json",
-                       headers={"X-Docuseal-Secret": SECRET}).status_code == 200
+                       headers={"X-Documenso-Secret": SECRET}).status_code == 200
     contract.refresh_from_db()
     assert contract.status == Contract.Status.SIGNED
 
 
 def test_webhook_view_rejects_without_configured_secret(client, settings, contract):
-    settings.DOCUSEAL_WEBHOOK_SECRET = ""
-    resp = client.post("/clients/docuseal/webhook/", "{}", content_type="application/json",
-                       headers={"X-Docuseal-Secret": ""})
+    settings.DOCUMENSO_WEBHOOK_SECRET = ""
+    resp = client.post("/clients/documenso/webhook/", "{}", content_type="application/json",
+                       headers={"X-Documenso-Secret": ""})
     assert resp.status_code == 403
 
 

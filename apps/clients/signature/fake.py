@@ -1,4 +1,4 @@
-"""Für Tests und Entwicklung ohne DocuSeal-Konto."""
+"""Für Tests und Entwicklung ohne E-Signatur-Dienst."""
 import itertools
 
 from django.utils import timezone
@@ -34,14 +34,6 @@ def _minimal_pdf(lines: list[str]) -> bytes:
 
 
 class FakeSignatureProvider(SignatureProvider):
-    calls: list[dict] = []
-
-    def create_submission(self, **kwargs):
-        FakeSignatureProvider.calls.append(kwargs)
-        n = next(_ids)
-        return SubmissionResult(submission_id=f"fake-{n}", signing_url=f"https://sign.example/s/fake-{n}",
-                                submitter_id=f"fake-sub-{n}")
-
     pdf_calls: list[dict] = []
 
     def create_submission_from_pdf(self, **kwargs):
@@ -58,6 +50,6 @@ class FakeSignatureProvider(SignatureProvider):
     def download(self, url):
         return _minimal_pdf([
             "TESTVERTRAG (Fake-Signatur)",
-            "Kein echter Vertrag - erzeugt ohne DocuSeal.",
+            "Kein echter Vertrag - erzeugt ohne E-Signatur-Dienst.",
             f"Unterschrieben (simuliert): {timezone.localtime():%d.%m.%Y %H:%M}",
         ])
