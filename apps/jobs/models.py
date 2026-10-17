@@ -19,6 +19,8 @@ class Mandate(TimeStampedModel):
     )
     title = models.CharField("Position", max_length=255)
     location = models.CharField("Einsatzort", max_length=255, blank=True)
+    employment_type = models.CharField("Anstellungsart", max_length=100, default="Festanstellung",
+                                       help_text="Steht im Vertrag: „… für eine Festanstellung zu gewinnen“")
     salary_budget = models.PositiveIntegerField("Gehaltsbudget (brutto/Jahr)", null=True, blank=True)
     description = models.TextField("Stellenbeschreibung", blank=True)
     must_have = models.JSONField("Musskriterien", default=list, blank=True)

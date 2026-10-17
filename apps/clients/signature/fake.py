@@ -42,6 +42,14 @@ class FakeSignatureProvider(SignatureProvider):
         return SubmissionResult(submission_id=f"fake-{n}", signing_url=f"https://sign.example/s/fake-{n}",
                                 submitter_id=f"fake-sub-{n}")
 
+    pdf_calls: list[dict] = []
+
+    def create_submission_from_pdf(self, **kwargs):
+        FakeSignatureProvider.pdf_calls.append(kwargs)
+        n = next(_ids)
+        return SubmissionResult(submission_id=f"fake-{n}", signing_url=f"https://sign.example/s/fake-{n}",
+                                submitter_id=f"fake-sub-{n}")
+
     reminded: list[str] = []
 
     def remind(self, submitter_id):

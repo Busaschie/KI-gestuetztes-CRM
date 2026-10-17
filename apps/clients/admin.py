@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 from django.utils import timezone
+from django.urls import reverse
 from django.utils.html import format_html
 
 from .models import Contract, ContractEvent, FeeModel
@@ -28,11 +29,11 @@ class ContractAdmin(admin.ModelAdmin):
     list_filter = ["status"]
     autocomplete_fields = ["mandate", "company", "signer"]
     readonly_fields = [
-        "approved_at", "scheduled_for", "signature_provider_id", "signing_link", "sent_at", "signed_at",
+        "preview_link", "draft_document", "approved_at", "scheduled_for", "signature_provider_id", "signing_link", "sent_at", "signed_at",
         "declined_at", "decline_reason", "reminders_sent", "last_reminder_at",
     ]
     fieldsets = [
-        (None, {"fields": ["mandate", "company", "fee_model", "signer", "status"]}),
+        (None, {"fields": ["mandate", "company", "fee_model", "signer", "status", "preview_link", "draft_document"]}),
         ("Abweichungen", {"fields": ["deviations", "approved_at"]}),
         ("Unterschrift", {"fields": [
             "scheduled_for", "signature_provider_id", "signing_link", ("sent_at", "signed_at"),
@@ -41,6 +42,13 @@ class ContractAdmin(admin.ModelAdmin):
     ]
     inlines = [ContractEventInline]
     actions = ["action_send", "action_stop", "action_send_now", "action_approve"]
+
+    @admin.display(description="Vertrag als PDF")
+    def preview_link(self, obj):
+        if not obj or not obj.pk:
+            return "Nach dem Speichern verfügbar"
+        url = reverse("clients:contract_preview", args=[obj.pk])
+        return format_html('<a href="{}" target="_blank">📄 Vorschau öffnen</a>', url)
 
     @admin.display(description="Link zur Unterschrift")
     def signing_link(self, obj):

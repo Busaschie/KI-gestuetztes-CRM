@@ -1,4 +1,6 @@
 """DocuSeal (Cloud EU: https://api.docuseal.eu, selbst gehostet: https://<host>/api)."""
+import base64
+
 import httpx
 
 from .base import SignatureError, SignatureProvider, SubmissionResult
@@ -33,6 +35,29 @@ class DocuSealProvider(SignatureProvider):
             raise SignatureError(f"Unerwartete Antwort von DocuSeal: {str(submitters)[:300]}")
         first = submitters[0]
         return SubmissionResult(submission_id=str(first["submission_id"]), signing_url=first.get("embed_src") or "",
+                                submitter_id=str(first.get("id") or ""))
+
+    def create_submission_from_pdf(self, *, pdf, name, role, signer_name, signer_email, external_id):
+        """POST /submissions/pdf (bei DocuSeal eine Pro-Funktion). Felder kommen aus Text-Tags im PDF."""
+        body = {
+            "name": name,
+            "send_email": True,
+            "documents": [{"name": name, "file": base64.b64encode(pdf).decode()}],
+            "submitters": [{"role": role, "name": signer_name, "email": signer_email, "external_id": external_id}],
+        }
+        try:
+            resp = httpx.post(f"{self.api_url}/submissions/pdf", json=body, headers=self.headers, timeout=self.timeout)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            raise SignatureError(f"DocuSeal {e.response.status_code}: {e.response.text[:300]}") from e
+        except httpx.HTTPError as e:
+            raise SignatureError(f"DocuSeal nicht erreichbar: {e}") from e
+        data = resp.json()
+        submitters = data.get("submitters") or []
+        if not data.get("id") or not submitters:
+            raise SignatureError(f"Unerwartete Antwort von DocuSeal: {str(data)[:300]}")
+        first = submitters[0]
+        return SubmissionResult(submission_id=str(data["id"]), signing_url=first.get("embed_src") or "",
                                 submitter_id=str(first.get("id") or ""))
 
     def remind(self, submitter_id):

@@ -10,6 +10,14 @@ class FeeModel(TimeStampedModel):
     name = models.CharField("Bezeichnung", max_length=100, help_text="z. B. Einzelauftrag 20 %")
     percent = models.DecimalField("Honorar in % vom Jahresgehalt", max_digits=5, decimal_places=2)
     guarantee_terms = models.TextField("Garantiebedingungen", blank=True)
+    # Werte im Vertrag (Vorlage Sandra, 16.10.) – je Honorarmodell einstellbar
+    guarantee_months = models.PositiveSmallIntegerField("Nachbesetzungsgarantie (Monate)", default=4)
+    protection_years = models.PositiveSmallIntegerField(
+        "Honorar bei späterer Einstellung (Jahre)", default=2,
+        help_text="Vorgestellte Kandidaten: Honorar auch bei Einstellung innerhalb dieser Frist",
+    )
+    first_interviews_days = models.PositiveSmallIntegerField("Tage bis zu den ersten Interviews", default=10)
+    payment_days = models.PositiveSmallIntegerField("Zahlungsziel (Tage)", default=14)
     is_default = models.BooleanField("Standard", default=False)
 
     class Meta:
@@ -59,6 +67,7 @@ class Contract(TimeStampedModel):
     reminders_sent = models.PositiveSmallIntegerField("Erinnerungen gesendet", default=0)
     last_reminder_at = models.DateTimeField("Letzte Erinnerung", null=True, blank=True)
     document = models.FileField("Vertragsdokument", upload_to="contracts/", blank=True)
+    draft_document = models.FileField("Erzeugter Vertrag (vor Unterschrift)", upload_to="contracts/drafts/", blank=True)
 
     class Meta:
         verbose_name = "Vertrag"

@@ -31,7 +31,7 @@ def contract_values(contract: Contract) -> dict:
         "Kunde": contract.company.name,
         "Position": contract.mandate.title,
         "Einsatzort": contract.mandate.location,
-        "Honorar": f"{fee.percent:g} % vom Jahresbruttogehalt",
+        "Honorar": f"{float(fee.percent):g} % vom Jahresbruttogehalt",
         "Garantie": fee.guarantee_terms,
         "Abweichungen": contract.deviations,
         "Datum": timezone.localdate().strftime("%d.%m.%Y"),
@@ -57,9 +57,25 @@ def _check_sendable(contract: Contract):
     signer = contract.get_signer()
     if not signer or not signer.email:
         raise ContractError("Kein Unterzeichner mit E-Mail-Adresse (Unterzeichner oder Ansprechpartner des Auftrags).")
-    if settings.SIGNATURE_PROVIDER != "fake" and not settings.DOCUSEAL_TEMPLATE_ID:
+    if settings.CONTRACT_SOURCE == "template" and settings.SIGNATURE_PROVIDER != "fake" and not settings.DOCUSEAL_TEMPLATE_ID:
         raise ContractError("DOCUSEAL_TEMPLATE_ID fehlt in der .env.")
+    if settings.CONTRACT_SOURCE == "pdf" and not settings.CONTRACTOR_NAME:
+        raise ContractError("Daten der Auftragnehmerin fehlen (CONTRACTOR_NAME usw. in der .env).")
     return signer
+
+
+def generate_contract_pdf(contract: Contract, for_signature: bool = False) -> bytes:
+    """Vertrag als PDF erzeugen und als „Erzeugter Vertrag“ am Vertrag ablegen (Nachweis, was versendet wurde)."""
+    from .contract_pdf import ContractLayoutError, build_contract_pdf
+
+    try:
+        pdf = build_contract_pdf(contract, for_signature=for_signature, signer_role=settings.DOCUSEAL_SIGNER_ROLE)
+    except ContractLayoutError as e:
+        raise ContractError(str(e)) from e
+    if for_signature:
+        stamp = timezone.localtime().strftime("%Y%m%d-%H%M")
+        contract.draft_document.save(f"vertrag-{contract.pk}-{stamp}.pdf", ContentFile(pdf), save=True)
+    return pdf
 
 
 def schedule_contract(contract: Contract) -> Contract:
@@ -78,7 +94,7 @@ def schedule_contract(contract: Contract) -> Contract:
     notify(
         f"📄 <b>Vertrag geht um {when:%H:%M} raus</b>\n{escape(str(contract.mandate))}\n"
         f"An: {escape(str(signer))} &lt;{escape(signer.email)}&gt;\n"
-        f"Honorar: {contract.fee_model.percent:g} %" + (f"\nAbweichungen: {escape(contract.deviations)}" if contract.deviations else ""),
+        f"Honorar: {float(contract.fee_model.percent):g} %" + (f"\nAbweichungen: {escape(contract.deviations)}" if contract.deviations else ""),
         [[("⛔ Stoppen", f"c{contract.pk}:stop"), ("📤 Jetzt senden", f"c{contract.pk}:now")]],
     )
     return contract
@@ -117,14 +133,22 @@ def send_contract(contract: Contract) -> Contract:
     signer = _check_sendable(contract)
 
     try:
-        result = get_signature_provider().create_submission(
-            template_id=settings.DOCUSEAL_TEMPLATE_ID or "0",
-            role=settings.DOCUSEAL_SIGNER_ROLE,
-            signer_name=str(signer),
-            signer_email=signer.email,
-            values=contract_values(contract),
-            external_id=f"contract-{contract.pk}",
-        )
+        provider = get_signature_provider()
+        if settings.CONTRACT_SOURCE == "pdf":
+            pdf = generate_contract_pdf(contract, for_signature=True)
+            result = provider.create_submission_from_pdf(
+                pdf=pdf, name=f"Vertrag {contract.mandate}"[:120], role=settings.DOCUSEAL_SIGNER_ROLE,
+                signer_name=str(signer), signer_email=signer.email, external_id=f"contract-{contract.pk}",
+            )
+        else:
+            result = provider.create_submission(
+                template_id=settings.DOCUSEAL_TEMPLATE_ID or "0",
+                role=settings.DOCUSEAL_SIGNER_ROLE,
+                signer_name=str(signer),
+                signer_email=signer.email,
+                values=contract_values(contract),
+                external_id=f"contract-{contract.pk}",
+            )
     except SignatureError as e:
         ContractEvent.objects.create(contract=contract, kind="send_failed", message=str(e))
         raise ContractError(str(e)) from e

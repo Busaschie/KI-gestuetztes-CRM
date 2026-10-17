@@ -63,7 +63,7 @@ DATABASES = {"default": env.db("DATABASE_URL")}
 AUTH_USER_MODEL = "accounts.User"
 
 LANGUAGE_CODE = "de-de"
-TIME_ZONE = "Europe/Bucharest"
+TIME_ZONE = env("TIME_ZONE", default="Europe/Bucharest")  # Sandra arbeitet in Rumänien; lokal z. B. Europe/Berlin
 USE_I18N = True
 USE_TZ = True
 
@@ -131,3 +131,11 @@ WHISPER_MODEL = env("WHISPER_MODEL", default="small")  # tiny | base | small | m
 CONTRACT_STOP_MINUTES = env.int("CONTRACT_STOP_MINUTES", default=60)  # 0 = sofort senden
 CONTRACT_REMINDER_DAYS = env.list("CONTRACT_REMINDER_DAYS", cast=int, default=[3, 7])  # Tage nach Versand
 CONTRACT_REMINDER_TIME = env("CONTRACT_REMINDER_TIME", default="09:00")  # tägliche Prüfung (Ortszeit)
+
+# Vertrags-PDF: Daten der Auftragnehmerin (Sandra) – nur in der .env, nicht im Repository
+CONTRACTOR_NAME = env("CONTRACTOR_NAME", default="")
+CONTRACTOR_ADDRESS = env("CONTRACTOR_ADDRESS", default="")  # Zeilen mit „|“ getrennt
+CONTRACTOR_TAX_ID = env("CONTRACTOR_TAX_ID", default="")  # z. B. „CUI: …“
+CONTRACTOR_SIGNER = env("CONTRACTOR_SIGNER", default="")  # Name in Text und Unterschriftszeile
+CONTRACT_SOURCE = env("CONTRACT_SOURCE", default="pdf")  # pdf = eigenes Vertrags-PDF | template = DocuSeal-Vorlage
+CONTRACT_GOVERNING_LAW = env("CONTRACT_GOVERNING_LAW", default="österreichisches Recht")  # offen: je Land? (felder.md)
