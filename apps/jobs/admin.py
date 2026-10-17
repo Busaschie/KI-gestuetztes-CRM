@@ -1,10 +1,11 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from .models import Mandate
 
 
 @admin.register(Mandate)
-class MandateAdmin(admin.ModelAdmin):
+class MandateAdmin(ModelAdmin):
     list_display = ["title", "company", "status", "has_signed_contract", "created_at"]
     list_filter = ["status"]
     search_fields = ["title", "company__name"]

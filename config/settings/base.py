@@ -10,6 +10,8 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
 
 DJANGO_APPS = [
+    "unfold",  # Admin-Design – muss vor django.contrib.admin stehen
+    "unfold.contrib.filters",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -135,3 +137,68 @@ CONTRACTOR_ADDRESS = env("CONTRACTOR_ADDRESS", default="")  # Zeilen mit „|“
 CONTRACTOR_TAX_ID = env("CONTRACTOR_TAX_ID", default="")  # z. B. „CUI: …“
 CONTRACTOR_SIGNER = env("CONTRACTOR_SIGNER", default="")  # Name in Text und Unterschriftszeile
 CONTRACT_GOVERNING_LAW = env("CONTRACT_GOVERNING_LAW", default="österreichisches Recht")  # offen: je Land? (felder.md)
+
+# Admin-Design (django-unfold) – Farben aus Sandras Logo (#C6122F), Seitenleiste nach Arbeitsbereichen
+from django.templatetags.static import static  # noqa: E402
+from django.urls import reverse_lazy  # noqa: E402
+
+
+def _nav(title, icon, url):
+    return {"title": title, "icon": icon, "link": reverse_lazy(url)}
+
+
+UNFOLD = {
+    "SITE_TITLE": "Sandra CRM",
+    "SITE_HEADER": "Sandra CRM",
+    "SITE_SUBHEADER": "Headhunting",
+    "SITE_ICON": lambda request: static("contract/logo.png"),
+    "SITE_FAVICONS": [{"rel": "icon", "type": "image/png", "href": lambda request: static("contract/logo.png")}],
+    "SHOW_VIEW_ON_SITE": False,
+    "COLORS": {
+        "primary": {
+            "50": "oklch(97.1% .013 22)",
+            "100": "oklch(93.6% .032 22)",
+            "200": "oklch(88.5% .062 22)",
+            "300": "oklch(80.8% .114 22)",
+            "400": "oklch(70.4% .17 22)",
+            "500": "oklch(61% .2 22)",
+            "600": "oklch(52.7% .205 22)",  # Logofarbe
+            "700": "oklch(46% .18 22)",
+            "800": "oklch(40% .155 22)",
+            "900": "oklch(35% .13 22)",
+            "950": "oklch(24% .09 22)",
+        },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {"title": "Kandidaten", "items": [
+                _nav("Kandidaten", "person_search", "admin:candidates_candidateprofile_changelist"),
+                _nav("Personen", "contacts", "admin:contacts_person_changelist"),
+                _nav("Dubletten", "content_copy", "admin:candidates_duplicatesuggestion_changelist"),
+            ]},
+            {"title": "Kunden & Aufträge", "items": [
+                _nav("Firmen", "apartment", "admin:contacts_company_changelist"),
+                _nav("Aufträge", "work", "admin:jobs_mandate_changelist"),
+                _nav("Kandidaten in Aufträgen", "send", "admin:pipeline_submission_changelist"),
+                _nav("Verträge", "contract", "admin:clients_contract_changelist"),
+                _nav("Honorarmodelle", "percent", "admin:clients_feemodel_changelist"),
+            ]},
+            {"title": "Kommunikation", "items": [
+                _nav("Wiedervorlagen", "event", "admin:communications_followup_changelist"),
+                _nav("Notizen", "sticky_note_2", "admin:communications_note_changelist"),
+                _nav("Eingang", "inbox", "admin:communications_inbounditem_changelist"),
+                _nav("Ausgang", "outbox", "admin:communications_outboundmessage_changelist"),
+                _nav("Bot-Entwürfe", "smart_toy", "admin:bot_botdraft_changelist"),
+            ]},
+            {"title": "Datenschutz & System", "collapsible": True, "items": [
+                _nav("Einwilligungen", "verified_user", "admin:privacy_consent_changelist"),
+                _nav("Betroffenenanfragen", "gavel", "admin:privacy_datasubjectrequest_changelist"),
+                _nav("Benutzer", "manage_accounts", "admin:accounts_user_changelist"),
+                _nav("Zeitpläne", "schedule", "admin:django_q_schedule_changelist"),
+                _nav("Fehlgeschlagene Aufgaben", "error", "admin:django_q_failure_changelist"),
+            ]},
+        ],
+    },
+}

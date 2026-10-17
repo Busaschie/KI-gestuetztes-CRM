@@ -1,10 +1,11 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin, TabularInline
 
 from .display import render_profile
 from .models import CandidateProfile, CVDocument, DuplicateSuggestion
 
 
-class CVInline(admin.TabularInline):
+class CVInline(TabularInline):
     model = CVDocument
     extra = 0
     fields = ["file", "original_filename", "received_at", "origin", "is_current"]
@@ -12,7 +13,7 @@ class CVInline(admin.TabularInline):
 
 
 @admin.register(CandidateProfile)
-class CandidateProfileAdmin(admin.ModelAdmin):
+class CandidateProfileAdmin(ModelAdmin):
     list_display = ["person", "headline", "years_experience", "available_from", "on_hold_until"]
     search_fields = ["person__first_name", "person__last_name", "headline"]
     autocomplete_fields = ["person"]
@@ -52,6 +53,6 @@ class CandidateProfileAdmin(admin.ModelAdmin):
 
 
 @admin.register(DuplicateSuggestion)
-class DuplicateSuggestionAdmin(admin.ModelAdmin):
+class DuplicateSuggestionAdmin(ModelAdmin):
     list_display = ["person_a", "person_b", "reason", "status"]
     list_filter = ["status"]

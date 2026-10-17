@@ -1,6 +1,7 @@
 Django>=5.1,<6
 django-environ>=0.11
 django-q2>=1.7
+django-unfold>=0.81
 psycopg[binary]>=3.2
 pgvector>=0.3
 httpx>=0.27

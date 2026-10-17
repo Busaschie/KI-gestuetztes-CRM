@@ -1,6 +1,8 @@
 """Aufbereitung der JSON-Profildaten für die lesbare Ansicht im Admin."""
 from django.template.loader import render_to_string
 
+from agents.llm.schemas import _clean_nulls
+
 
 def fmt_date(value) -> str:
     """'2019-03' → '03/2019', '2019' bleibt '2019'."""
@@ -24,7 +26,7 @@ def period(item: dict, ongoing: bool = False) -> str:
 def _dicts(value) -> list[dict]:
     """Robust gegen alte oder von Hand bearbeitete Daten: Strings werden zu {'title': ...}."""
     out = []
-    for entry in value or []:
+    for entry in _clean_nulls(value) or []:  # alte Daten: "null" als Text
         if isinstance(entry, dict):
             out.append(entry)
         elif entry:
@@ -33,7 +35,7 @@ def _dicts(value) -> list[dict]:
 
 
 def _strings(value) -> list[str]:
-    return [str(v) for v in (value or []) if v]
+    return [str(v) for v in (_clean_nulls(value) or []) if v]
 
 
 def profile_context(profile) -> dict:

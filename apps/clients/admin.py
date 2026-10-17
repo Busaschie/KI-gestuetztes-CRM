@@ -2,17 +2,18 @@ from django.contrib import admin, messages
 from django.utils import timezone
 from django.urls import reverse
 from django.utils.html import format_html
+from unfold.admin import ModelAdmin, TabularInline
 
 from .models import Contract, ContractEvent, FeeModel
 from .services import ContractError, schedule_contract, send_contract, stop_contract
 
 
 @admin.register(FeeModel)
-class FeeModelAdmin(admin.ModelAdmin):
+class FeeModelAdmin(ModelAdmin):
     list_display = ["name", "percent", "is_default"]
 
 
-class ContractEventInline(admin.TabularInline):
+class ContractEventInline(TabularInline):
     model = ContractEvent
     extra = 0
     can_delete = False
@@ -24,7 +25,7 @@ class ContractEventInline(admin.TabularInline):
 
 
 @admin.register(Contract)
-class ContractAdmin(admin.ModelAdmin):
+class ContractAdmin(ModelAdmin):
     list_display = ["mandate", "company", "fee_model", "status", "scheduled_for", "sent_at", "reminders_sent", "signed_at"]
     list_filter = ["status"]
     autocomplete_fields = ["mandate", "company", "signer"]
