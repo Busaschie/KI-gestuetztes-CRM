@@ -8,7 +8,7 @@ from apps.communications.models import InboundItem
 
 from .briefing import build_briefing
 from .models import BotDraft
-from .processing import handle_callback, process_draft, show_open
+from .processing import handle_callback, process_draft, remember_message, show_open
 
 log = logging.getLogger(__name__)
 
@@ -19,8 +19,10 @@ HELP = (
     "/status – Einstellungen des Bots\n"
     "/id – deine Chat-ID\n"
     "/hilfe – diese Übersicht\n\n"
-    "Sprach- oder Textnachricht schicken, z. B. „Mit Eva Meier telefoniert, will nächste Woche Rückmeldung“. "
-    "Ich schlage Notiz, Person und Wiedervorlage vor – gespeichert wird erst nach deiner Bestätigung."
+    "Sprach- oder Textnachricht schicken – gespeichert wird erst nach deiner Bestätigung:\n"
+    "• Notiz: „Mit Eva Meier telefoniert, will nächste Woche Rückmeldung“\n"
+    "• Neuer Auftrag: „Neuer Auftrag von Muster AG, Vertriebsleiter in Wien, Ansprechpartner Herr Meier, 20 Prozent“\n"
+    "• Kandidat zuordnen: „Anna Huber für Vertriebsleiter Muster AG vormerken“"
 )
 
 
@@ -87,7 +89,7 @@ def _start(item: InboundItem | None, chat_id: int, client, ack: str) -> None:
     if item is None or hasattr(item, "bot_draft"):
         return  # Telegram hat die Nachricht erneut zugestellt – schon in Arbeit
     draft = BotDraft.objects.create(chat_id=chat_id, inbound=item)
-    client.send_message(chat_id, ack)
+    remember_message(draft, client.send_message(chat_id, ack))
     if settings.TELEGRAM_ASYNC:
         from django_q.tasks import async_task
         async_task("apps.bot.processing.process_draft", draft.pk)

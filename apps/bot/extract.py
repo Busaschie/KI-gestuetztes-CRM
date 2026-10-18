@@ -18,11 +18,15 @@ MAX_CANDIDATES = 5
 
 
 class NoteOut(BaseModel):
+    intent: str = Field("note", description='"note", "mandate" (neuer Suchauftrag) oder "assign" (Kandidat zu Auftrag)')
     person_name: str | None = None
     company: str | None = None
     note: str = ""
     follow_up_date: str | None = Field(None, description="JJJJ-MM-TT oder null")
     follow_up_text: str | None = None
+    position: str | None = None
+    location: str | None = None
+    fee_percent: float | None = None
 
 
 SCHEMA = NoteOut.model_json_schema()
@@ -43,11 +47,24 @@ def extract_note(text: str, today: date | None = None) -> dict:
     user = f"Kalender:\n{_calendar(today)}\n\nNachricht:\n{text}"
     raw = get_llm().complete_json(PROMPT, user, SCHEMA)
     try:
-        out = NoteOut.model_validate({k: v for k, v in (raw or {}).items() if k in NoteOut.model_fields})
+        clean = {k: (None if k not in ("note", "intent") and isinstance(v, str)
+                     and v.strip().lower() in ("", "null", "none") else v)
+                 for k, v in (raw or {}).items()
+                 if k in NoteOut.model_fields and not (k in ("note", "intent") and v is None)}
+        if isinstance(clean.get("fee_percent"), str):  # z. B. "20 %" oder "20,5"
+            try:
+                clean["fee_percent"] = float(clean["fee_percent"].replace("%", "").replace(",", ".").strip())
+            except ValueError:
+                clean["fee_percent"] = None
+        out = NoteOut.model_validate(clean)
     except ValidationError as e:
         raise LLMError(f"Antwort des Sprachmodells unbrauchbar: {e.errors()[0]['msg']}") from e
     data = out.model_dump()
-    for key in ("person_name", "company", "follow_up_text"):
+    intent = str(data.get("intent") or "").strip().lower()
+    data["intent"] = intent if intent in ("mandate", "assign") else "note"
+    if data["fee_percent"] is not None and not 0 < data["fee_percent"] <= 50:
+        data["fee_percent"] = None  # unplausibel (Hörfehler)
+    for key in ("person_name", "company", "follow_up_text", "position", "location"):
         if isinstance(data[key], str) and data[key].strip().lower() in ("", "null", "none"):
             data[key] = None
     data["note"] = (data["note"] or text).strip()

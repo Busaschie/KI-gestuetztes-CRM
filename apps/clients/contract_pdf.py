@@ -78,7 +78,7 @@ def contract_context(contract) -> dict:
         "client_signer": str(signatory) if signatory else "",
         "position": mandate.title,
         "employment_type": mandate.employment_type or "Festanstellung",
-        "percent": _fmt_percent(fee.percent),
+        "percent": _fmt_percent(contract.percent),
         "guarantee_months": fee.guarantee_months,
         "protection_years": fee.protection_years,
         "interview_days": fee.first_interviews_days,
@@ -106,9 +106,12 @@ def build_contract_pdf(contract, for_signature: bool = False) -> bytes:
     _cards(cv, c, W, H, M)
     _kpis(cv, c, W, H, M)
     body_top = H - 336
-    _body(cv, c, W, M, body_top, bottom=62)
+    annex = _body(cv, c, W, M, body_top, bottom=62)
     _signatures(cv, c, W, M, for_signature)
     cv.showPage()
+    if annex:
+        _annex(cv, c, W, H, M)
+        cv.showPage()
     cv.save()
     return buf.getvalue()
 
@@ -224,12 +227,40 @@ def _bullets(items, st):
     return [Paragraph(t, st["li"], bulletText="•") for t in items]
 
 
-def _body(cv, c, W, M, top, bottom):
+def _body(cv, c, W, M, top, bottom) -> bool:
+    """Zeichnet die beiden Textspalten. Gibt True zurück, wenn die Sondervereinbarungen auf Seite 2 (Anlage) müssen."""
     st = _styles()
-    who = escape(c["contractor_signer"])
     gap = 22
     col_w = (W - 2 * M - gap) / 2
+    annex = bool(c["deviations"])  # Seite 1 ist voll – Sondervereinbarungen immer als Anlage auf Seite 2
+    left, right = _stories(c, st, col_w, annex)
+    for x, story in ((M, left), (M + col_w + gap, right)):
+        frame = Frame(x, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+        frame.addFromList(story, cv)  # entfernt alles, was passt, aus story
+        if story:  # lieber klarer Fehler als abgeschnittener Vertrag
+            raise ContractLayoutError("Vertragstext passt nicht auf eine Seite")
+    return annex
 
+
+def _annex(cv, c, W, H, M):
+    """Seite 2: Anlage mit den Sondervereinbarungen."""
+    st = _styles()
+    story = [
+        _heading("09", "Anlage – Abweichende Vereinbarungen", st),
+        Paragraph(f"Zwischen {_b(c['client_name'])} und {_b(c['contractor_name'] or c['contractor_signer'])} – "
+                  f"Position {_b(c['position'])}, Vertrag vom {c['date']}.", st["p"]),
+        Spacer(1, 6),
+        Paragraph(escape(c["deviations"]).replace("\n", "<br/>"), st["p"]),
+    ]
+    frame = Frame(M, 62, W - 2 * M, H - 62 - M, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    frame.addFromList(story, cv)
+    if story:
+        raise ContractLayoutError("Sondervereinbarungen zu lang (mehr als eine Seite Anlage)")
+
+
+def _stories(c, st, col_w, annex: bool):
+    """annex=True: letzter Punkt unter 08 verweist auf die Anlage (Seite 2) statt des Schlusssatzes."""
+    who = escape(c["contractor_signer"])
     left = [
         _heading("01", "Zusammenarbeit und Zielsetzung", st),
         Paragraph(f"{who} unterstützt die {_b(c['client_name'])} dabei, einen qualifizierten "
@@ -288,18 +319,12 @@ def _body(cv, c, W, M, top, bottom):
             f"Es gilt ausschließlich {escape(c['law'])}. Gerichtsstand ist der Sitz des beauftragenden Unternehmens.",
             "Sollten einzelne Bestimmungen dieses Vertrages unwirksam sein oder werden, bleibt die Wirksamkeit "
             "der übrigen Bestimmungen unberührt.",
+            "Die Anlage „Abweichende Vereinbarungen“ (Seite 2) ist Bestandteil dieses Vertrags und geht "
+            "abweichenden Regelungen oben vor." if annex else
             "Diese Vereinbarung bildet die Grundlage für eine vertrauensvolle und erfolgreiche Zusammenarbeit.",
         ], st),
     ]
-    if c["deviations"]:
-        right += [_heading("09", "Abweichende Vereinbarungen", st),
-                  Paragraph(escape(c["deviations"]).replace("\n", "<br/>"), st["p"])]
-
-    for x, story in ((M, left), (M + col_w + gap, right)):
-        frame = Frame(x, bottom, col_w, top - bottom, leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
-        frame.addFromList(story, cv)  # entfernt alles, was passt, aus story
-        if story:  # lieber klarer Fehler als abgeschnittener Vertrag
-            raise ContractLayoutError("Vertragstext passt nicht auf eine Seite (Abweichungen zu lang?)")
+    return left, right
 
 
 def _box(html, st, width):

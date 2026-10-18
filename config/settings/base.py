@@ -159,7 +159,7 @@ CONTRACT_GOVERNING_LAW = env("CONTRACT_GOVERNING_LAW", default="österreichische
 
 # Admin-Design (django-unfold) – Farben aus Sandras Logo (#C6122F), Seitenleiste nach Arbeitsbereichen
 from django.templatetags.static import static  # noqa: E402
-from django.urls import reverse_lazy  # noqa: E402
+from django.urls import reverse, reverse_lazy  # noqa: E402
 
 
 def _nav(title, icon, url):
@@ -194,10 +194,11 @@ UNFOLD = {
         "navigation": [
             {"title": "Kandidaten", "items": [
                 _nav("Kandidaten", "person_search", "admin:candidates_candidateprofile_changelist"),
-                _nav("Personen", "contacts", "admin:contacts_person_changelist"),
                 _nav("Dubletten", "content_copy", "admin:candidates_duplicatesuggestion_changelist"),
             ]},
             {"title": "Kunden & Aufträge", "items": [
+                {"title": "Ansprechpartner", "icon": "badge",
+                 "link": lambda request: reverse("admin:contacts_person_changelist") + "?rolle=kunde"},
                 _nav("Firmen", "apartment", "admin:contacts_company_changelist"),
                 _nav("Aufträge", "work", "admin:jobs_mandate_changelist"),
                 _nav("Kandidaten in Aufträgen", "send", "admin:pipeline_submission_changelist"),
@@ -210,6 +211,9 @@ UNFOLD = {
                 _nav("Eingang", "inbox", "admin:communications_inbounditem_changelist"),
                 _nav("Ausgang", "outbox", "admin:communications_outboundmessage_changelist"),
                 _nav("Bot-Entwürfe", "smart_toy", "admin:bot_botdraft_changelist"),
+            ]},
+            {"title": "Kontakte", "items": [
+                _nav("Alle Personen", "contacts", "admin:contacts_person_changelist"),
             ]},
             {"title": "Datenschutz & System", "collapsible": True, "items": [
                 _nav("Einwilligungen", "verified_user", "admin:privacy_consent_changelist"),

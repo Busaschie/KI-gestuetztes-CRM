@@ -61,6 +61,14 @@ class TelegramClient:
             if "message is not modified" not in str(e):
                 raise
 
+    def delete_message(self, chat_id: int, message_id: int) -> bool:
+        """Löscht eine Nachricht (eigene oder – im privaten Chat – des Nutzers), nur bis 48 h nach dem Senden."""
+        try:
+            self._call("deleteMessage", chat_id=chat_id, message_id=message_id)
+            return True
+        except TelegramError:
+            return False
+
     def answer_callback(self, callback_id: str, text: str = "") -> None:
         self._call("answerCallbackQuery", callback_query_id=callback_id, text=text)
 

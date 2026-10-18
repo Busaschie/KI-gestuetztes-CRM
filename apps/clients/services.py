@@ -78,7 +78,9 @@ def schedule_contract(contract: Contract) -> Contract:
     notify(
         f"📄 <b>Vertrag geht um {when:%H:%M} raus</b>\n{escape(str(contract.mandate))}\n"
         f"An: {escape(str(signer))} &lt;{escape(signer.email)}&gt;\n"
-        f"Honorar: {float(contract.fee_model.percent):g} %" + (f"\nAbweichungen: {escape(contract.deviations)}" if contract.deviations else ""),
+        f"Honorar: {float(contract.percent):g} %"
+        + (f" (abweichend, Modell {float(contract.fee_model.percent):g} %)" if contract.fee_deviates else "")
+        + (f"\nSondervereinbarungen: {escape(contract.deviations)}" if contract.deviations else ""),
         [[("⛔ Stoppen", f"c{contract.pk}:stop"), ("📤 Jetzt senden", f"c{contract.pk}:now")]],
     )
     return contract

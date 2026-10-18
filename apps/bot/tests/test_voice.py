@@ -16,7 +16,11 @@ ME = 4711
 
 class FakeClient:
     def __init__(self):
-        self.sent, self.edits, self.answers = [], [], []
+        self.sent, self.edits, self.answers, self.deleted = [], [], [], []
+
+    def delete_message(self, chat_id, message_id):
+        self.deleted.append(message_id)
+        return True
 
     def send_message(self, chat_id, text, buttons=None):
         self.sent.append((chat_id, text, buttons))
@@ -146,11 +150,12 @@ def test_cancel_and_double_press(meier, llm):
     client = FakeClient()
     handle_update(msg_update(text="Eva Meier x"), client)
     draft = BotDraft.objects.get()
+    proposal_id = draft.message_id
     press(client, f"d{draft.pk}:x")
     press(client, f"d{draft.pk}:ok", update_id=1001)
-    assert not Note.objects.exists()
-    assert InboundItem.objects.get().status == InboundItem.Status.IGNORED
-    assert "Bereits erledigt" in client.answers[-1]
+    assert not Note.objects.exists() and not InboundItem.objects.exists() and not BotDraft.objects.exists()
+    assert proposal_id in client.deleted and 1 in client.deleted  # Vorschlag + Originalnachricht
+    assert "nicht gefunden" in client.answers[-1]
 
 
 def test_redelivered_message_processed_once(meier, llm):
@@ -169,6 +174,23 @@ def test_empty_transcript_fails_gracefully(db, llm, monkeypatch):
     item = InboundItem.objects.get()
     assert item.status == InboundItem.Status.FAILED and "Keine Sprache" in item.error
     assert "⚠️" in client.sent[-1][1]
+
+
+def test_discard_failed_deletes_chat_messages_and_data(db, llm, monkeypatch):
+    monkeypatch.setattr(FakeTranscriber, "text", "")
+    client = FakeClient()
+    handle_update(msg_update(message_id=7, voice={"file_id": "f1", "duration": 1}), client)
+    draft = BotDraft.objects.get()
+    bot_ids = draft.data["_tg"]
+    assert len(bot_ids) == 2  # „Verarbeite …“ + Fehlermeldung
+    attachment = InboundItem.objects.get().attachment
+    path = attachment.path
+    press(client, f"d{draft.pk}:x")
+    assert set(client.deleted) >= {7, *bot_ids}  # Original-Sprachnachricht + Bot-Meldungen
+    assert not BotDraft.objects.exists() and not InboundItem.objects.exists()
+    import os
+    assert not os.path.exists(path)
+    assert "Verworfen" in client.answers[-1]
 
 
 def test_foreign_chat_cannot_press_buttons(meier, llm):
@@ -195,7 +217,8 @@ def test_extract_cleans_answer(db, llm):
     llm(person_name="null", note="", follow_up_date="kein Datum", follow_up_text="x")
     data = extract_note("Nur ein Gedanke", today=date(2026, 10, 13))
     assert data == {"person_name": None, "company": None, "note": "Nur ein Gedanke",
-                    "follow_up_date": None, "follow_up_text": None}
+                    "follow_up_date": None, "follow_up_text": None,
+                    "intent": "note", "position": None, "location": None, "fee_percent": None}
 
 
 # --- Etappe 3: Fehlerfälle, Datum, /offen, /status --------------------------------------------------

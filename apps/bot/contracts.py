@@ -26,7 +26,7 @@ def handle_contract_callback(callback: dict, client) -> None:
             return
     except ContractError as e:
         client.answer_callback(callback["id"], "Nicht möglich")
-        client.send_message(chat_id, f"⚠️ {escape(str(e))}")
+        client.send_message(chat_id, f"⚠️ Vertrag nicht versendet: {escape(str(e))}\nBitte im Admin prüfen.")
         return
     client.answer_callback(callback["id"], result[:60])
     if message_id:

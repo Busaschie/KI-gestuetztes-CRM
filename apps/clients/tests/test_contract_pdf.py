@@ -62,9 +62,26 @@ def test_signature_tag_only_for_signing(contract):
 def test_long_deviations_raise_clear_error(contract):
     from apps.clients.contract_pdf import ContractLayoutError
 
-    contract.deviations = "Sehr lange Sonderklausel. " * 200
+    contract.deviations = "Sehr lange Sonderklausel. " * 1500  # mehr als eine Seite Anlage
     with pytest.raises(ContractLayoutError):
         build_contract_pdf(contract)
+
+
+def test_deviations_go_to_annex_page(contract):
+    assert len(PdfReader(io.BytesIO(build_contract_pdf(contract))).pages) == 1
+    contract.deviations = "Längere Sonderklausel mit mehreren Bedingungen. " * 20
+    reader = PdfReader(io.BytesIO(build_contract_pdf(contract, True)))
+    assert len(reader.pages) == 2
+    assert "Anlage „Abweichende Vereinbarungen“ (Seite 2)" in text_of(build_contract_pdf(contract))
+    assert "Längere Sonderklausel" in " ".join(reader.pages[1].extract_text().split())
+    assert "{{signature, r1}}" in " ".join(reader.pages[0].extract_text().split())
+
+
+def test_fee_percent_override_in_contract(contract):
+    contract.fee_percent = Decimal("22.5")
+    assert contract.needs_approval and contract.percent == Decimal("22.5")
+    text = text_of(build_contract_pdf(contract))
+    assert "22,5 %" in text and "15 %" not in text
 
 
 def test_send_uses_generated_pdf(contract):

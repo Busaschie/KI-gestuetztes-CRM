@@ -48,8 +48,13 @@ class Contract(TimeStampedModel):
     company = models.ForeignKey(Company, on_delete=models.PROTECT, related_name="contracts", verbose_name="Kunde")
     fee_model = models.ForeignKey(FeeModel, on_delete=models.PROTECT, verbose_name="Honorarmodell")
     status = models.CharField(max_length=15, choices=Status.choices, default=Status.DRAFT)
+    fee_percent = models.DecimalField(
+        "Honorar abweichend (%)", max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Leer = Honorar aus dem Honorarmodell. Abweichender Wert steht so im Vertrag und braucht Freigabe.",
+    )
     deviations = models.TextField(
-        "Abweichungen von der Vorlage", blank=True, help_text="Nur bei Abweichungen ist eine Freigabe nötig"
+        "Sondervereinbarungen", blank=True,
+        help_text="Erscheint im Vertrag als „09 Abweichende Vereinbarungen“ (ggf. auf Seite 2); braucht Freigabe",
     )
     signer = models.ForeignKey(
         Person, on_delete=models.PROTECT, null=True, blank=True, related_name="contracts_to_sign",
@@ -79,8 +84,17 @@ class Contract(TimeStampedModel):
         return f"Vertrag {self.mandate} ({self.get_status_display()})"
 
     @property
+    def percent(self):
+        """Honorar, das im Vertrag steht."""
+        return self.fee_percent if self.fee_percent is not None else self.fee_model.percent
+
+    @property
+    def fee_deviates(self) -> bool:
+        return self.fee_percent is not None and self.fee_percent != self.fee_model.percent
+
+    @property
     def needs_approval(self) -> bool:
-        return bool(self.deviations.strip())
+        return bool(self.deviations.strip()) or self.fee_deviates
 
     @property
     def is_signed(self) -> bool:

@@ -19,6 +19,7 @@ class ContractEventInline(TabularInline):
     can_delete = False
     fields = ["created_at", "kind", "message"]
     readonly_fields = fields
+    ordering = ["-created_at", "-pk"]  # neueste oben
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -35,7 +36,7 @@ class ContractAdmin(ModelAdmin):
     ]
     fieldsets = [
         (None, {"fields": ["mandate", "company", "fee_model", "signer", "status", "preview_link", "draft_document"]}),
-        ("Abweichungen", {"fields": ["deviations", "approved_at"]}),
+        ("Abweichungen (brauchen Freigabe)", {"fields": ["fee_percent", "deviations", "approved_at"]}),
         ("Unterschrift", {"fields": [
             "scheduled_for", "signature_provider_id", "signing_link", ("sent_at", "signed_at"),
             ("declined_at", "decline_reason"), ("reminders_sent", "last_reminder_at"), "document",
@@ -89,5 +90,6 @@ class ContractAdmin(ModelAdmin):
 
     @admin.action(description="Abweichungen freigeben")
     def action_approve(self, request, queryset):
-        n = queryset.filter(approved_at__isnull=True).exclude(deviations="").update(approved_at=timezone.now())
+        todo = [c.pk for c in queryset.filter(approved_at__isnull=True).select_related("fee_model") if c.needs_approval]
+        n = queryset.filter(pk__in=todo).update(approved_at=timezone.now())
         self.message_user(request, f"{n} Vertrag/Verträge freigegeben.", messages.SUCCESS)
