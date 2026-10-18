@@ -22,7 +22,8 @@ HELP = (
     "Sprach- oder Textnachricht schicken – gespeichert wird erst nach deiner Bestätigung:\n"
     "• Notiz: „Mit Eva Meier telefoniert, will nächste Woche Rückmeldung“\n"
     "• Neuer Auftrag: „Neuer Auftrag von Muster AG, Vertriebsleiter in Wien, Ansprechpartner Herr Meier, 20 Prozent“\n"
-    "• Kandidat zuordnen: „Anna Huber für Vertriebsleiter Muster AG vormerken“"
+    "• Kandidat zuordnen: „Anna Huber für Vertriebsleiter Muster AG vormerken“\n"
+    "• Vertragsstatus: „Rechnung an Muster AG ist raus“ / „Muster AG hat bezahlt“"
 )
 
 

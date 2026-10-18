@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+{% load l10n %}
+
+{% block content %}
+<div class="border border-base-200 rounded-default shadow-xs dark:border-base-800">
+    <p class="font-semibold p-4 text-font-important-light dark:text-font-important-dark">
+        Diese Verträge wirklich stornieren? Das lässt sich nicht rückgängig machen.
+    </p>
+    <div class="border-t border-base-200 p-4 dark:border-base-800">
+        <ul class="leading-relaxed">
+            {% for c in contracts %}<li>{{ c }}{% if c.status in sent_states %} – <b>bereits versendet: bitte auch in Documenso stornieren</b>{% endif %}</li>{% endfor %}
+        </ul>
+    </div>
+    <form method="post" class="border-t border-base-200 px-4 py-3 dark:border-base-800 flex gap-4 items-center">
+        {% csrf_token %}
+        {% for c in contracts %}<input type="hidden" name="_selected_action" value="{{ c.pk|unlocalize }}">{% endfor %}
+        <input type="hidden" name="action" value="action_cancel">
+        <input type="hidden" name="post" value="yes">
+        <button type="submit" class="bg-red-600 text-white font-semibold px-3 py-2 rounded-default">Ja, stornieren</button>
+        <a href="" onclick="history.back(); return false;">Abbrechen</a>
+    </form>
+</div>
+{% endblock %}

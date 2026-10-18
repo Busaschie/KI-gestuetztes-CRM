@@ -218,7 +218,8 @@ def test_extract_cleans_answer(db, llm):
     data = extract_note("Nur ein Gedanke", today=date(2026, 10, 13))
     assert data == {"person_name": None, "company": None, "note": "Nur ein Gedanke",
                     "follow_up_date": None, "follow_up_text": None,
-                    "intent": "note", "position": None, "location": None, "fee_percent": None}
+                    "intent": "note", "position": None, "location": None, "fee_percent": None,
+                    "contract_status": None}
 
 
 # --- Etappe 3: Fehlerfälle, Datum, /offen, /status --------------------------------------------------

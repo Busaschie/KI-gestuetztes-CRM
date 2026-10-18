@@ -18,7 +18,8 @@ MAX_CANDIDATES = 5
 
 
 class NoteOut(BaseModel):
-    intent: str = Field("note", description='"note", "mandate" (neuer Suchauftrag) oder "assign" (Kandidat zu Auftrag)')
+    intent: str = Field("note", description='"note", "mandate" (neuer Suchauftrag), "assign" (Kandidat zu Auftrag) '
+                                            'oder "contract_status" (Rechnung/bezahlt)')
     person_name: str | None = None
     company: str | None = None
     note: str = ""
@@ -27,6 +28,7 @@ class NoteOut(BaseModel):
     position: str | None = None
     location: str | None = None
     fee_percent: float | None = None
+    contract_status: str | None = Field(None, description='"invoice_due" oder "paid"')
 
 
 SCHEMA = NoteOut.model_json_schema()
@@ -61,7 +63,11 @@ def extract_note(text: str, today: date | None = None) -> dict:
         raise LLMError(f"Antwort des Sprachmodells unbrauchbar: {e.errors()[0]['msg']}") from e
     data = out.model_dump()
     intent = str(data.get("intent") or "").strip().lower()
-    data["intent"] = intent if intent in ("mandate", "assign") else "note"
+    data["intent"] = intent if intent in ("mandate", "assign", "contract_status") else "note"
+    if data["contract_status"] not in ("invoice_due", "paid"):
+        data["contract_status"] = None
+    if data["intent"] == "contract_status" and not data["contract_status"]:
+        data["intent"] = "note"  # unklar, welcher Status – lieber als Notiz
     if data["fee_percent"] is not None and not 0 < data["fee_percent"] <= 50:
         data["fee_percent"] = None  # unplausibel (Hörfehler)
     for key in ("person_name", "company", "follow_up_text", "position", "location"):

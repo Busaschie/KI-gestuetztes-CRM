@@ -97,9 +97,21 @@ def stop_contract(contract: Contract) -> Contract:
 
 def send_due_contracts() -> int:
     """Läuft jede Minute (django-q): geplante Verträge versenden, deren Stopp-Fenster abgelaufen ist."""
-    due = Contract.objects.filter(status=Contract.Status.SCHEDULED, scheduled_for__lte=timezone.now())
+    now = timezone.now()
+    due = Contract.objects.filter(status=Contract.Status.SCHEDULED, scheduled_for__lte=now)
+    missed_before = now - timedelta(minutes=settings.SEND_MAX_DELAY_MINUTES)
     sent = 0
     for contract in due:
+        if contract.scheduled_for < missed_before:  # qcluster lief nicht – nicht verspätet senden
+            when = timezone.localtime(contract.scheduled_for)
+            contract.status, contract.scheduled_for = Contract.Status.DRAFT, None
+            contract.save(update_fields=["status", "scheduled_for", "updated_at"])
+            ContractEvent.objects.create(contract=contract, kind="missed",
+                                         message=f"Versand verpasst (geplant {when:%d.%m.%Y %H:%M}) – zurück auf Entwurf")
+            notify(f"⏰ <b>Vertragsversand verpasst</b> (geplant {when:%d.%m. %H:%M}): {escape(str(contract.mandate))}\n"
+                   "Nicht verspätet gesendet – bitte neu freigeben.",
+                   [[("📤 Jetzt senden", f"c{contract.pk}:now")]])
+            continue
         try:
             send_contract(contract)
             sent += 1

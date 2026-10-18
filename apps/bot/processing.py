@@ -72,6 +72,9 @@ def process_draft(draft_id: int, client=None) -> BotDraft:
     elif draft.data.get("intent") == "assign":  # Kandidat einem Auftrag zuordnen
         from .assign import prepare as prepare_assign
         prepare_assign(draft)
+    elif draft.data.get("intent") == "contract_status":  # „Firma X hat bezahlt“
+        from .contract_status import prepare as prepare_status
+        prepare_status(draft)
     else:
         persons = find_persons(draft.data.get("person_name"), draft.data.get("company"))
         draft.candidates = [p.pk for p in persons]
@@ -130,6 +133,9 @@ def render(draft: BotDraft) -> tuple[str, list]:
     if draft.data.get("intent") == "assign" and "a" in draft.data:
         from .assign import render as render_assign
         return render_assign(draft)
+    if draft.data.get("intent") == "contract_status" and "s" in draft.data:
+        from .contract_status import render as render_status
+        return render_status(draft)
     d = draft.data
     lines = [f"📝 <b>Notiz:</b> {escape(d.get('note', ''))}"]
     if draft.person:
@@ -210,6 +216,10 @@ def handle_callback(callback: dict, client) -> None:
     if draft.data.get("intent") == "assign" and "a" in draft.data:
         from .assign import handle_action as handle_assign
         handle_assign(draft, action, callback, client)
+        return
+    if draft.data.get("intent") == "contract_status" and "s" in draft.data:
+        from .contract_status import handle_action as handle_status
+        handle_status(draft, action, callback, client)
         return
 
     if action.startswith("p") and action[1:].isdigit() and int(action[1:]) in draft.candidates:

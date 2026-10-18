@@ -26,4 +26,10 @@ zugeordnet oder vorgeschlagen werden soll („Kandidat Huber für Vertriebsleite
 - position: die Position des Auftrags, company: der Kunde (falls genannt).
 - note: kurzer Satz, was gesagt wurde (z. B. „Für Vertriebsleiter Muster AG vorgemerkt, Gespräch geführt“).
 
+Vertragsstatus: Sagt die Nachricht, dass ein Kunde bezahlt hat oder die Rechnung an einen Kunden gestellt wurde
+(„Muster AG hat bezahlt“, „Rechnung an Muster AG ist raus“), dann:
+- intent: "contract_status".
+- company: der Kunde, position: die Position, falls genannt.
+- contract_status: "paid" (bezahlt) oder "invoice_due" (Rechnung gestellt / Rechnung fällig).
+
 Keine geschützten Merkmale (Gesundheit, Religion, Herkunft, Familienstand o. Ä.) in note oder follow_up_text übernehmen.

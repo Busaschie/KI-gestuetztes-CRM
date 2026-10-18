@@ -104,6 +104,8 @@ EMAIL_TIMEOUT = 30
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="")
 EMAIL_REPLY_TO = env.list("EMAIL_REPLY_TO", default=[])  # Antworten an Sandra
 OUTBOUND_STOP_MINUTES = env.int("OUTBOUND_STOP_MINUTES", default=60)  # Stopp-Fenster für Profilversand; 0 = sofort
+# Geplanter Versand (Verträge, Nachrichten) mehr als so viele Minuten überfällig (qcluster lief nicht) → nicht mehr senden
+SEND_MAX_DELAY_MINUTES = env.int("SEND_MAX_DELAY_MINUTES", default=120)
 
 # Standardabsage (P1 Punkt 7) – erst nach Rechtsprüfung (Art. 22 DSGVO) im Betrieb einschalten
 STANDARD_REJECTION_ENABLED = env.bool("STANDARD_REJECTION_ENABLED", default=False)

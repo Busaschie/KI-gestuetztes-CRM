@@ -213,9 +213,20 @@ def _mark_presented(msg: OutboundMessage, now) -> None:
 
 def send_due_messages() -> int:
     """Läuft jede Minute (django-q): freigegebene Nachrichten senden, deren Stopp-Fenster abgelaufen ist."""
-    due = OutboundMessage.objects.filter(status=OutboundMessage.Status.SCHEDULED, scheduled_for__lte=timezone.now())
+    now = timezone.now()
+    due = OutboundMessage.objects.filter(status=OutboundMessage.Status.SCHEDULED, scheduled_for__lte=now)
+    missed_before = now - timedelta(minutes=settings.SEND_MAX_DELAY_MINUTES)
     sent = 0
     for msg in due.select_related("recipient", "mandate"):
+        if msg.scheduled_for < missed_before:  # qcluster lief nicht – nicht verspätet senden
+            when = timezone.localtime(msg.scheduled_for)
+            stop_message(msg)
+            msg.error = f"Versand verpasst (geplant {when:%d.%m.%Y %H:%M}) – nicht verspätet gesendet"
+            msg.save(update_fields=["error", "updated_at"])
+            notify(f"⏰ <b>Versand verpasst</b> (geplant {when:%d.%m. %H:%M}): {escape(msg.get_kind_display())} an "
+                   f"{escape(str(msg.recipient))}\n{escape(msg.subject)}\nNicht verspätet gesendet – bitte neu freigeben.",
+                   [[("📤 Jetzt senden", f"o{msg.pk}:now")]])
+            continue
         try:
             send_message(msg)
             sent += 1
