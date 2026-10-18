@@ -111,6 +111,12 @@ STANDARD_REJECTION_DAYS = env.int("STANDARD_REJECTION_DAYS", default=10)  # Tage
 STANDARD_REJECTION_TIME = env("STANDARD_REJECTION_TIME", default="10:00")  # Versand am Folgetag (Ortszeit)
 STANDARD_REJECTION_PREPARE_TIME = env("STANDARD_REJECTION_PREPARE_TIME", default="07:25")  # Planung, vor dem Briefing
 
+# Kontaktpflege (P1 Punkt 6): Vorschläge nach so vielen Monaten ohne Kontakt; Kunden mit laufendem Auftrag nie
+CONTACT_CARE_MONTHS_PLACED = env.int("CONTACT_CARE_MONTHS_PLACED", default=6)  # vermittelte Kandidaten
+CONTACT_CARE_MONTHS_CLIENTS = env.int("CONTACT_CARE_MONTHS_CLIENTS", default=4)  # frühere Kunden (Ansprechpartner)
+CONTACT_SUGGESTIONS_PER_DAY = env.int("CONTACT_SUGGESTIONS_PER_DAY", default=3)
+CONTACT_CARE_TIME = env("CONTACT_CARE_TIME", default="07:20")  # Planung, vor dem Briefing
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))  # CV-Originale (später EU-Objektspeicher)
 

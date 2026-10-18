@@ -20,6 +20,8 @@ DAILY = [
      lambda: settings.CONTRACT_REMINDER_TIME),
     ("Standardabsagen planen (Versand am Folgetag)", "apps.communications.rejections.prepare_standard_rejections",
      lambda: settings.STANDARD_REJECTION_PREPARE_TIME),
+    ("Kontaktpflege: Wiedervorlagen nach Regeln", "apps.communications.contact_care.plan_contact_care",
+     lambda: settings.CONTACT_CARE_TIME),
 ]
 
 

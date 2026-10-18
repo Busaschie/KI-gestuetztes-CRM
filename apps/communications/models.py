@@ -24,12 +24,18 @@ class Note(TimeStampedModel):
     def __str__(self):
         return f"{self.person}: {self.text[:50]}"
 
+    def save(self, *args, **kwargs):
+        new = self._state.adding
+        super().save(*args, **kwargs)
+        if new:  # jede Notiz zählt als Kontakt (Kontaktpflege, P1 Punkt 6)
+            mark_contacted(self.person_id, self.created_at)
+
 
 class FollowUp(TimeStampedModel):
     """Wiedervorlage – aus Sprachnotiz oder fester Regel (P1 Punkt 6)."""
     class Reason(models.TextChoices):
         NOTE = "note", "Aus Notiz"
-        RULE_6_MONTHS = "rule_6m", "Kontaktpflege 6 Monate"
+        RULE_6_MONTHS = "rule_6m", "Kontaktpflege (Regel)"
         JOB_CHANGE = "job_change", "Jobwechsel"
         ON_HOLD = "on_hold", "Vorgemerkter Kandidat"
         CONTRACT = "contract", "Vertrag nicht unterschrieben"
@@ -173,3 +179,13 @@ class OutboundAttachment(models.Model):
     def source(self):
         """Die Datei, die verschickt wird."""
         return self.file if self.file else (self.cv.file if self.cv_id else None)
+
+
+def mark_contacted(person_id, when=None) -> None:
+    """„Letzter Kontakt“ der Person nach vorne setzen (nie zurück)."""
+    from django.db.models import Q
+    from django.utils import timezone
+
+    when = when or timezone.now()
+    Person.objects.filter(pk=person_id).filter(Q(last_contacted_at__isnull=True) | Q(last_contacted_at__lt=when)).update(
+        last_contacted_at=when)

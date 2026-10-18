@@ -190,6 +190,8 @@ def send_message(msg: OutboundMessage) -> OutboundMessage:
     with transaction.atomic():
         msg.status, msg.sent_at, msg.scheduled_for, msg.error = OutboundMessage.Status.SENT, now, None, ""
         msg.save(update_fields=["status", "sent_at", "scheduled_for", "error", "updated_at"])
+        from .models import mark_contacted
+        mark_contacted(msg.recipient_id, now)
         if msg.kind == OutboundMessage.Kind.PROFILE_TO_CLIENT:
             _mark_presented(msg, now)
         elif msg.kind == OutboundMessage.Kind.STANDARD_REJECTION:

@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef
 from unfold.admin import ModelAdmin, TabularInline
 
-from .models import Company, Employment, Person, PersonOrigin
+from .models import Company, Employment, Person, PersonOrigin, client_contact_q
 
 
 class EmploymentInline(TabularInline):
@@ -14,12 +14,6 @@ class EmploymentInline(TabularInline):
 class PersonOriginInline(TabularInline):
     model = PersonOrigin
     extra = 0
-
-
-def client_contact_q() -> Q:
-    """Ansprechpartner beim Kunden: Ansprechpartner eines Auftrags, Unterzeichner (Firma/Vertrag) oder aktuell bei einem Kunden."""
-    return (Q(mandates__isnull=False) | Q(signatory_for__isnull=False) | Q(contracts_to_sign__isnull=False)
-            | Q(employments__is_current=True, employments__company__is_client=True))
 
 
 class RoleFilter(admin.SimpleListFilter):
@@ -44,7 +38,7 @@ class RoleFilter(admin.SimpleListFilter):
 class PersonAdmin(ModelAdmin):
     list_display = ["__str__", "role", "email", "city", "country", "last_contacted_at", "retain_until"]
     search_fields = ["first_name", "last_name", "email", "linkedin_url"]
-    list_filter = [RoleFilter, "country"]
+    list_filter = [RoleFilter, "no_contact_care", "country"]
     inlines = [EmploymentInline, PersonOriginInline]
 
     def get_queryset(self, request):

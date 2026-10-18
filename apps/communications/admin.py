@@ -13,11 +13,36 @@ class NoteAdmin(ModelAdmin):
     autocomplete_fields = ["person", "mandate"]
 
 
+class OpenFilter(admin.SimpleListFilter):
+    title = "Status"
+    parameter_name = "offen"
+
+    def lookups(self, request, model_admin):
+        return [("ja", "Offen"), ("nein", "Erledigt")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "ja":
+            return queryset.filter(done_at__isnull=True)
+        if self.value() == "nein":
+            return queryset.filter(done_at__isnull=False)
+        return queryset
+
+
 @admin.register(FollowUp)
 class FollowUpAdmin(ModelAdmin):
     list_display = ["due_date", "text", "person", "reason", "done_at"]
-    list_filter = ["reason"]
+    list_filter = [OpenFilter, "reason"]
     autocomplete_fields = ["person", "mandate"]
+    actions = ["action_done"]
+
+    @admin.action(description="Erledigt (zählt als Kontakt)")
+    def action_done(self, request, queryset):
+        from .contact_care import mark_done
+
+        todo = list(queryset.filter(done_at__isnull=True))
+        for fu in todo:
+            mark_done(fu)
+        self.message_user(request, f"{len(todo)} Wiedervorlage(n) erledigt.", messages.SUCCESS)
 
 
 @admin.register(InboundItem)

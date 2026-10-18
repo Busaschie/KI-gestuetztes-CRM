@@ -6,7 +6,7 @@ from django.core.files.base import ContentFile
 
 from apps.communications.models import InboundItem
 
-from .briefing import build_briefing
+from .briefing import build_briefing, send_briefing
 from .models import BotDraft
 from .processing import handle_callback, process_draft, remember_message, show_open
 
@@ -46,6 +46,9 @@ def handle_update(update: dict, client) -> None:
             if cb.get("data", "").startswith("c"):
                 from .contracts import handle_contract_callback
                 handle_contract_callback(cb, client)
+            elif cb.get("data", "").startswith("k"):
+                from .followups import handle_followup_callback
+                handle_followup_callback(cb, client)
             elif cb.get("data", "").startswith("o"):
                 from .outbound import handle_outbound_callback
                 handle_outbound_callback(cb, client)
@@ -70,7 +73,7 @@ def handle_update(update: dict, client) -> None:
     if command in ("/", "/hilfe", "/help"):
         client.send_message(chat_id, HELP)
     elif command == "/briefing":
-        client.send_message(chat_id, build_briefing())
+        send_briefing(chat_id, client)
     elif command == "/offen":
         show_open(chat_id, client)
     elif command == "/status":

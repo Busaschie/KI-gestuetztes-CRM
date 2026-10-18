@@ -52,7 +52,10 @@ class Person(TimeStampedModel):
     preferred_language = models.CharField(
         "Korrespondenzsprache", max_length=5, blank=True, help_text="Für Informationspflicht und Absagen, z. B. de, ro"
     )
-    last_contacted_at = models.DateTimeField("Letzter Kontakt", null=True, blank=True)
+    last_contacted_at = models.DateTimeField("Letzter Kontakt", null=True, blank=True,
+                                             help_text="Automatisch: Notiz, gesendete Nachricht, Kontaktpflege erledigt")
+    no_contact_care = models.BooleanField("Keine Kontaktpflege", default=False,
+                                          help_text="Keine automatischen Kontaktvorschläge für diese Person")
     retain_until = models.DateField(
         "Speichern bis", null=True, blank=True, help_text="Löschfrist – danach Löschung vorschlagen"
     )
@@ -102,3 +105,10 @@ class PersonOrigin(TimeStampedModel):
 
     def __str__(self):
         return self.get_origin_display()
+
+
+def client_contact_q() -> models.Q:
+    """Ansprechpartner beim Kunden: Ansprechpartner eines Auftrags, Unterzeichner (Firma/Vertrag) oder aktuell bei einem Kunden."""
+    return (models.Q(mandates__isnull=False) | models.Q(signatory_for__isnull=False)
+            | models.Q(contracts_to_sign__isnull=False)
+            | models.Q(employments__is_current=True, employments__company__is_client=True))

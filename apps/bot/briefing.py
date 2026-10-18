@@ -28,8 +28,11 @@ def build_briefing(today=None) -> str:
     today = today or timezone.localdate()
     parts = [f"<b>Briefing {today:%d.%m.%Y}</b>"]
 
-    follow_ups = list(
-        FollowUp.objects.filter(done_at__isnull=True, due_date__lte=today).select_related("person", "mandate")
+    from apps.communications.contact_care import CARE_REASONS, suggestions
+
+    follow_ups = list(  # Kontaktpflege-Vorschläge kommen gesondert (höchstens N pro Tag)
+        FollowUp.objects.filter(done_at__isnull=True, due_date__lte=today).exclude(reason__in=CARE_REASONS)
+        .select_related("person", "mandate")
     )
     if follow_ups:
         def fmt_fu(f):
@@ -66,6 +69,11 @@ def build_briefing(today=None) -> str:
         parts += ["", f"<b>Aktive Aufträge ohne Vertrag ({len(no_contract)})</b>",
                   *_lines(no_contract, lambda m: f"• {escape(str(m))}")]
 
+    care = suggestions(today).count()
+    if care:
+        shown = min(care, settings.CONTACT_SUGGESTIONS_PER_DAY)
+        parts += ["", f"<b>Kontaktvorschläge ({shown} von {care})</b> – einzeln unten mit Knöpfen"]
+
     from apps.communications.rejections import upcoming_rejections
 
     rejections = upcoming_rejections()
@@ -89,7 +97,18 @@ def send_daily_briefing() -> int:
     if not chat_ids:
         log.warning("Briefing nicht gesendet: TELEGRAM_ALLOWED_CHAT_IDS ist leer")
         return 0
-    client, text = TelegramClient(), build_briefing()
+    client = TelegramClient()
     for chat_id in chat_ids:
-        client.send_message(chat_id, text)
+        send_briefing(chat_id, client)
     return len(chat_ids)
+
+
+def send_briefing(chat_id: int, client) -> None:
+    """Briefing-Text, danach die Kontaktvorschläge des Tages einzeln mit Knöpfen."""
+    from apps.communications.contact_care import suggestions
+
+    from .followups import render_suggestion
+
+    client.send_message(chat_id, build_briefing())
+    for fu in suggestions()[:settings.CONTACT_SUGGESTIONS_PER_DAY]:
+        client.send_message(chat_id, *render_suggestion(fu))
