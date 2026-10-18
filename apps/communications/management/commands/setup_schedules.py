@@ -18,6 +18,8 @@ DAILY = [
     ("Telegram-Briefing", "apps.bot.briefing.send_daily_briefing", lambda: settings.TELEGRAM_BRIEFING_TIME),
     ("Verträge: Erinnerungen an Kunden", "apps.clients.services.send_contract_reminders",
      lambda: settings.CONTRACT_REMINDER_TIME),
+    ("Standardabsagen planen (Versand am Folgetag)", "apps.communications.rejections.prepare_standard_rejections",
+     lambda: settings.STANDARD_REJECTION_PREPARE_TIME),
 ]
 
 

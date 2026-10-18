@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils import timezone
 from unfold.admin import ModelAdmin
 
 from apps.communications.services import MessageError, prepare_profile_message
@@ -15,7 +16,12 @@ class SubmissionAdmin(ModelAdmin):
                     "last_feedback_at"]
     autocomplete_fields = ["candidate", "mandate"]
     search_fields = ["candidate__person__first_name", "candidate__person__last_name", "mandate__title"]
-    actions = ["action_prepare_profile"]
+    actions = ["action_prepare_profile", "action_consent"]
+
+    @admin.action(description="Zustimmung zur Vorstellung dokumentieren (jetzt)")
+    def action_consent(self, request, queryset):
+        n = queryset.filter(consent_to_present_at__isnull=True).update(consent_to_present_at=timezone.now(), updated_at=timezone.now())
+        self.message_user(request, f"Zustimmung bei {n} Kandidat(en) dokumentiert.", messages.SUCCESS)
 
     @admin.action(description="Profil an Kunden vorbereiten (Entwurf mit CV)")
     def action_prepare_profile(self, request, queryset):

@@ -23,6 +23,10 @@ class MessageError(Exception):
     """Nachricht kann (noch) nicht versendet werden – Text ist für Sandra lesbar."""
 
 
+class MessageObsolete(MessageError):
+    """Nachricht ist überholt (z. B. Standardabsage, aber Sandra hat den Kandidaten inzwischen anders markiert)."""
+
+
 def notify(text: str, buttons=None) -> None:
     from apps.clients.services import notify as _notify  # ein gemeinsamer Telegram-Hinweis
     _notify(text, buttons)
@@ -99,6 +103,9 @@ def check_sendable(msg: OutboundMessage) -> None:
         with_cv = {a.cv.profile_id for a in msg.attachments.select_related("cv") if a.cv_id}
         if missing := [str(s.candidate.person) for s in subs if s.candidate_id not in with_cv]:
             raise MessageError("Kein Lebenslauf im Anhang für: " + ", ".join(missing))
+    if msg.kind == OutboundMessage.Kind.STANDARD_REJECTION:
+        from .rejections import check_still_due
+        check_still_due(msg)
 
 
 def schedule_message(msg: OutboundMessage, user=None) -> OutboundMessage:
@@ -140,6 +147,9 @@ def stop_message(msg: OutboundMessage) -> OutboundMessage:
         raise MessageError(f"Nur geplante Nachrichten können gestoppt werden (Status: {msg.get_status_display()}).")
     msg.status, msg.scheduled_for = OutboundMessage.Status.STOPPED, None
     msg.save(update_fields=["status", "scheduled_for", "updated_at"])
+    if msg.kind == OutboundMessage.Kind.STANDARD_REJECTION:
+        from .rejections import reset_after_stop
+        reset_after_stop(msg)
     return msg
 
 
@@ -182,6 +192,9 @@ def send_message(msg: OutboundMessage) -> OutboundMessage:
         msg.save(update_fields=["status", "sent_at", "scheduled_for", "error", "updated_at"])
         if msg.kind == OutboundMessage.Kind.PROFILE_TO_CLIENT:
             _mark_presented(msg, now)
+        elif msg.kind == OutboundMessage.Kind.STANDARD_REJECTION:
+            from .rejections import mark_rejected
+            mark_rejected(msg, now)
     return msg
 
 
@@ -205,6 +218,10 @@ def send_due_messages() -> int:
             send_message(msg)
             sent += 1
             notify(f"📤 {escape(msg.get_kind_display())} versendet an {escape(str(msg.recipient))}: {escape(msg.subject)}")
+        except MessageObsolete as e:  # z. B. Sandra hat den Kandidaten inzwischen anders markiert – still stoppen
+            msg.status, msg.scheduled_for, msg.error = OutboundMessage.Status.STOPPED, None, str(e)
+            msg.save(update_fields=["status", "scheduled_for", "error", "updated_at"])
+            notify(f"ℹ️ Nicht versendet (überholt): {escape(msg.subject)}\n{escape(str(e))}")
         except MessageError as e:
             if msg.status == OutboundMessage.Status.SCHEDULED:  # Prüfung fehlgeschlagen → zurück auf Entwurf
                 msg.status, msg.scheduled_for, msg.error = OutboundMessage.Status.DRAFT, None, str(e)

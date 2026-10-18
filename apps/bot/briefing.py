@@ -66,6 +66,16 @@ def build_briefing(today=None) -> str:
         parts += ["", f"<b>Aktive Aufträge ohne Vertrag ({len(no_contract)})</b>",
                   *_lines(no_contract, lambda m: f"• {escape(str(m))}")]
 
+    from apps.communications.rejections import upcoming_rejections
+
+    rejections = upcoming_rejections()
+    if rejections:
+        def fmt_r(m):
+            return (f"• {timezone.localtime(m.scheduled_for):%d.%m. %H:%M} {escape(str(m.recipient))}"
+                    f" → {escape(str(m.mandate or ''))}")
+        parts += ["", f"<b>Geplante Standardabsagen ({len(rejections)})</b> – Stopp über die Einzelnachricht oder im Admin",
+                  *_lines(rejections, fmt_r)]
+
     if len(parts) == 1:
         parts += ["", "Heute nichts Dringendes. 👍"]
     return "\n".join(parts)

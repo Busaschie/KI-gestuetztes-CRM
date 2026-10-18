@@ -105,6 +105,12 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="")
 EMAIL_REPLY_TO = env.list("EMAIL_REPLY_TO", default=[])  # Antworten an Sandra
 OUTBOUND_STOP_MINUTES = env.int("OUTBOUND_STOP_MINUTES", default=60)  # Stopp-Fenster für Profilversand; 0 = sofort
 
+# Standardabsage (P1 Punkt 7) – erst nach Rechtsprüfung (Art. 22 DSGVO) im Betrieb einschalten
+STANDARD_REJECTION_ENABLED = env.bool("STANDARD_REJECTION_ENABLED", default=False)
+STANDARD_REJECTION_DAYS = env.int("STANDARD_REJECTION_DAYS", default=10)  # Tage nach Zuordnung zum Auftrag
+STANDARD_REJECTION_TIME = env("STANDARD_REJECTION_TIME", default="10:00")  # Versand am Folgetag (Ortszeit)
+STANDARD_REJECTION_PREPARE_TIME = env("STANDARD_REJECTION_PREPARE_TIME", default="07:25")  # Planung, vor dem Briefing
+
 MEDIA_URL = "media/"
 MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))  # CV-Originale (später EU-Objektspeicher)
 
