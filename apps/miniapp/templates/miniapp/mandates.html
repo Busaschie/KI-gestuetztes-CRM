@@ -1,0 +1,10 @@
+{% if message %}<div class="flash">{{ message }}</div>{% endif %}
+<h2>Offene Aufträge ({{ mandates|length }})</h2>
+<div class="card">
+{% for m in mandates %}
+  <a class="item" href="#" hx-get="{% url 'miniapp:mandate' m.pk %}" hx-target="#main">
+    <div class="title">{{ m.title }} – {{ m.company }}</div>
+    <div class="sub">{{ m.get_status_display }} · {{ m.n }} Kandidat(en) · {{ m.contract_label }}{% if m.location %} · {{ m.location }}{% endif %}</div>
+  </a>
+{% empty %}<div class="empty">Keine offenen Aufträge.</div>{% endfor %}
+</div>

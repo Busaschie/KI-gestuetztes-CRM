@@ -1,0 +1,30 @@
+<a class="back" href="#" hx-get="{% url 'miniapp:mandates' %}" hx-target="#main">‹ Alle Aufträge</a>
+{% if message %}<div class="flash" style="margin-top:8px">{{ message }}</div>{% endif %}
+<h2>{{ mandate.title }} – {{ mandate.company }}</h2>
+<div class="card"><div class="item">
+  <div class="sub">{{ mandate.get_status_display }}{% if mandate.location %} · {{ mandate.location }}{% endif %}{% if mandate.contact_person %} · Ansprechpartner {{ mandate.contact_person }}{% endif %}</div>
+</div></div>
+
+<h2>Kandidaten ({{ subs|length }})</h2>
+<div class="card">
+{% for s in subs %}
+  <div class="item">
+    <div class="title">{{ s.candidate.person }}</div>
+    <div class="sub">{% if s.candidate.headline %}{{ s.candidate.headline }} · {% endif %}<span class="badge">{{ s.get_stage_display }}</span>
+      {% if s.presented_at %} · vorgestellt {{ s.presented_at|date:"d.m." }}{% endif %}</div>
+    <div class="actions">
+      <select name="stage" hx-post="{% url 'miniapp:submission_action' s.pk 'stage' %}" hx-target="#main" hx-trigger="change">
+        {% for value, label in stages %}<option value="{{ value }}"{% if value == s.stage %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button hx-post="{% url 'miniapp:submission_action' s.pk 'spoken' %}" hx-target="#main">
+        {% if s.spoken_with %}🗣 Gesprochen ✓{% else %}🗣 Gesprochen?{% endif %}</button>
+      {% if s.consent_to_present_at %}
+        <button disabled>✔ Zustimmung {{ s.consent_to_present_at|date:"d.m." }}</button>
+      {% else %}
+        <button hx-post="{% url 'miniapp:submission_action' s.pk 'consent' %}" hx-target="#main"
+                hx-confirm="Hat {{ s.candidate.person }} der Vorstellung beim Kunden zugestimmt?">✔ Zustimmung</button>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}<div class="empty">Noch keine Kandidaten – per Sprache zuordnen: „Name für {{ mandate.title }} {{ mandate.company }} vormerken“.</div>{% endfor %}
+</div>

@@ -1,0 +1,58 @@
+{% if message %}<div class="flash">{{ message }}</div>{% endif %}
+
+<h2>Wiedervorlagen fällig ({{ due|length }})</h2>
+<div class="card">
+{% for fu in due %}
+  <div class="item">
+    <div class="title">{{ fu.text }}</div>
+    <div class="sub">{% if fu.due_date < today %}<span class="late">{{ fu.due_date|date:"d.m." }}</span>{% else %}heute{% endif %}{% if fu.person %} · {{ fu.person }}{% endif %}{% if fu.mandate %} · {{ fu.mandate }}{% endif %}</div>
+    <div class="actions">
+      <button class="primary" hx-post="{% url 'miniapp:followup_action' fu.pk 'done' %}" hx-target="#main">✅ Erledigt</button>
+      <button hx-post="{% url 'miniapp:followup_action' fu.pk 'week' %}" hx-target="#main">⏭ +1 Woche</button>
+    </div>
+  </div>
+{% empty %}<div class="empty">Nichts fällig. 👍</div>{% endfor %}
+</div>
+
+<h2>Kontaktvorschläge ({{ care|length }})</h2>
+<div class="card">
+{% for fu in care %}
+  <div class="item">
+    <div class="title">{{ fu.person }}</div>
+    <div class="sub">{{ fu.text }}</div>
+    <div class="actions">
+      <button class="primary" hx-post="{% url 'miniapp:followup_action' fu.pk 'done' %}" hx-target="#main">✅ Kontakt erledigt</button>
+      <button hx-post="{% url 'miniapp:followup_action' fu.pk 'month' %}" hx-target="#main">⏭ 1 Monat</button>
+      <button hx-post="{% url 'miniapp:followup_action' fu.pk 'off' %}" hx-target="#main"
+              hx-confirm="Keine Kontaktpflege mehr für {{ fu.person }}?">🚫 Nie</button>
+    </div>
+  </div>
+{% empty %}<div class="empty">Keine Vorschläge heute.</div>{% endfor %}
+</div>
+
+<h2>Geplanter Versand ({{ scheduled_count }})</h2>
+<div class="card">
+{% for c in contracts %}
+  <div class="item">
+    <div class="title">📄 Vertrag: {{ c.mandate }}</div>
+    <div class="sub">geht um {{ c.scheduled_for|time:"H:i" }} raus</div>
+    <div class="actions">
+      <button hx-post="{% url 'miniapp:stop_action' 'contract' c.pk %}" hx-target="#main"
+              hx-confirm="Vertragsversand stoppen?">⛔ Stoppen</button>
+    </div>
+  </div>
+{% endfor %}
+{% for m in out_messages %}
+  <div class="item">
+    <div class="title">✉️ {{ m.get_kind_display }} an {{ m.recipient }}</div>
+    <div class="sub">{{ m.subject }} · {{ m.scheduled_for|date:"d.m. H:i" }}</div>
+    <div class="actions">
+      <button hx-post="{% url 'miniapp:stop_action' 'message' m.pk %}" hx-target="#main"
+              hx-confirm="Versand stoppen?">⛔ Stoppen</button>
+    </div>
+  </div>
+{% endfor %}
+{% if not contracts and not out_messages %}<div class="empty">Nichts geplant.</div>{% endif %}
+</div>
+
+{% if unassigned %}<h2>Nicht zugeordnet</h2><div class="card"><div class="empty">{{ unassigned }} Eingang/Eingänge – im Admin unter „Eingang“.</div></div>{% endif %}

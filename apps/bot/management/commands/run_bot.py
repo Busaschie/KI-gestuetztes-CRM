@@ -27,6 +27,13 @@ class Command(BaseCommand):
         except TelegramError as e:
             raise CommandError(str(e)) from e
         client.set_commands(COMMANDS)
+        from django.conf import settings
+        try:
+            client.set_menu_button(settings.MINIAPP_URL)
+            if settings.MINIAPP_URL:
+                self.stdout.write(f"Mini App im Menü-Knopf: {settings.MINIAPP_URL}")
+        except TelegramError as e:  # z. B. keine HTTPS-Adresse – Bot läuft trotzdem
+            self.stderr.write(f"Menü-Knopf nicht gesetzt: {e}")
         self.stdout.write(self.style.SUCCESS(f"Bot @{me['username']} läuft – Strg+C beendet."))
         if n := recover_stuck(client):
             self.stdout.write(self.style.WARNING(f"{n} unterbrochene(r) Vorschlag/Vorschläge auf Fehler gesetzt"))

@@ -9,5 +9,6 @@ urlpatterns = [
     path("clients/", include("apps.clients.urls")),
     path("jobs/", include("apps.jobs.urls")),
     path("pipeline/", include("apps.pipeline.urls")),
+    path("tg/", include("apps.miniapp.urls")),
     path("media/<path:path>", protected_media, name="protected_media"),
 ]

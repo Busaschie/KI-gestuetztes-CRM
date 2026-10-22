@@ -33,6 +33,7 @@ LOCAL_APPS = [
     "apps.communications",
     "apps.privacy",
     "apps.bot",
+    "apps.miniapp",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -144,7 +145,10 @@ DOCUMENSO_WEBHOOK_SECRET = env("DOCUMENSO_WEBHOOK_SECRET", default="")  # Header
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 TELEGRAM_ALLOWED_CHAT_IDS = env.list("TELEGRAM_ALLOWED_CHAT_IDS", cast=int, default=[])  # leer = niemand freigeschaltet
 TELEGRAM_BRIEFING_TIME = env("TELEGRAM_BRIEFING_TIME", default="07:30")  # Ortszeit (TIME_ZONE)
-TELEGRAM_ASYNC = env.bool("TELEGRAM_ASYNC", default=False)  # True = Verarbeitung über qcluster (Bot bleibt reaktionsfähig)
+TELEGRAM_ASYNC = env.bool("TELEGRAM_ASYNC", default=False)
+# Telegram Mini App (B-032): öffentliche HTTPS-Adresse von /tg/ (lokal z. B. cloudflared-Tunnel); leer = kein Menü-Knopf
+MINIAPP_URL = env("MINIAPP_URL", default="")
+MINIAPP_MAX_AGE_SECONDS = env.int("MINIAPP_MAX_AGE_SECONDS", default=24 * 3600)  # wie lange eine geöffnete App gilt  # True = Verarbeitung über qcluster (Bot bleibt reaktionsfähig)
 
 # Sprache → Text (Sprachnachrichten): mistral (Betrieb, EU) | whisper (lokal) | fake
 TRANSCRIBE_PROVIDER = env("TRANSCRIBE_PROVIDER", default="whisper")

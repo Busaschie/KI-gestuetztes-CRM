@@ -44,6 +44,14 @@ class TelegramClient:
         self._call("setMyCommands", commands=cmds)
         self._call("setMyCommands", commands=cmds, scope={"type": "all_private_chats"})
 
+    def set_menu_button(self, url: str = "", text: str = "App") -> None:
+        """Menü-Knopf unten links: Mini App (url gesetzt) oder die Befehlsliste (url leer)."""
+        if url:
+            button = {"type": "web_app", "text": text, "web_app": {"url": url}}
+        else:
+            button = {"type": "commands"}
+        self._call("setChatMenuButton", menu_button=button)
+
     def send_message(self, chat_id: int, text: str, buttons: list[list[tuple[str, str]]] | None = None) -> dict:
         """buttons: Zeilen von (Beschriftung, callback_data) – erscheinen als Knöpfe unter der Nachricht."""
         params = {"chat_id": chat_id, "text": _shorten(text), "parse_mode": "HTML", "disable_web_page_preview": True}

@@ -1,0 +1,40 @@
+{% if message %}<div class="flash">{{ message }}</div>{% endif %}
+{% for title, items in groups %}
+<h2>{{ title }} ({{ items|length }})</h2>
+<div class="card">
+{% for c in items %}
+  <div class="item">
+    <div class="title">{{ c.mandate.title }} – {{ c.company }}</div>
+    <div class="sub">
+      Honorar {{ c.percent|floatformat:"-2" }} %{% if c.fee_deviates %} (abweichend){% endif %}
+      {% with s=c.get_signer %}{% if s %} · {{ s }}{% endif %}{% endwith %}
+      {% if c.status == "scheduled" %} · geht um {{ c.scheduled_for|time:"H:i" }} raus{% endif %}
+      {% if c.sent_at and c.status in "sent pending" %} · versendet {{ c.sent_at|date:"d.m." }}{% if c.reminders_sent %}, {{ c.reminders_sent }} Erinnerung(en){% endif %}{% endif %}
+      {% if c.signed_at %} · unterschrieben {{ c.signed_at|date:"d.m.Y" }}{% endif %}
+    </div>
+    {% if c.status == "draft" and c.needs_approval and not c.approved_at %}
+      <div class="sub late">Abweichung – bitte im Admin freigeben</div>
+    {% endif %}
+    <div class="actions">
+      {% if c.status == "draft" %}
+        <button class="primary" hx-post="{% url 'miniapp:contract_action' c.pk 'send' %}" hx-target="#main"
+                hx-confirm="Vertrag an den Kunden senden ({{ stop_minutes }} min Stopp-Fenster)?">📤 Senden</button>
+      {% elif c.status == "scheduled" %}
+        <button hx-post="{% url 'miniapp:contract_action' c.pk 'stop' %}" hx-target="#main"
+                hx-confirm="Vertragsversand stoppen?">⛔ Stoppen</button>
+        <button hx-post="{% url 'miniapp:contract_action' c.pk 'now' %}" hx-target="#main"
+                hx-confirm="Jetzt sofort senden?">📤 Jetzt senden</button>
+      {% elif c.status == "signed" %}
+        <button hx-post="{% url 'miniapp:contract_action' c.pk 'invoice' %}" hx-target="#main"
+                hx-confirm="Status: Rechnung fällig?">🧾 Rechnung fällig</button>
+        <button class="primary" hx-post="{% url 'miniapp:contract_action' c.pk 'paid' %}" hx-target="#main"
+                hx-confirm="Status: Bezahlt?">💶 Bezahlt</button>
+      {% elif c.status == "invoice_due" %}
+        <button class="primary" hx-post="{% url 'miniapp:contract_action' c.pk 'paid' %}" hx-target="#main"
+                hx-confirm="Status: Bezahlt?">💶 Bezahlt</button>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}<div class="empty">Keine.</div>{% endfor %}
+</div>
+{% endfor %}
